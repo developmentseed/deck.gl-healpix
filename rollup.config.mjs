@@ -19,13 +19,13 @@ export default [
       replace({
         preventAssignment: true,
         'process.env.NODE_ENV': JSON.stringify(env),
-        'process.env.PACKAGE_VERSION': JSON.stringify(pkg.version),
+        'process.env.PACKAGE_VERSION': JSON.stringify(pkg.version)
       }),
       typescript({
         tsconfig: './tsconfig.json',
         declaration: true,
         declarationDir: './dist/types',
-        outDir: './dist',
+        outDir: './dist'
       })
     ],
     output: [
