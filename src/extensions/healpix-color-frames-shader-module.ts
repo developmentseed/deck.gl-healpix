@@ -4,11 +4,13 @@ import type { ShaderModule } from '@luma.gl/shadertools';
 /**
  * Uniform/binding props consumed by the HEALPix color-frame shader module.
  *
- * - `frameIndex` selects the row in the texture (the active animation frame).
- * - `healpixFramesTexture` is a `width=cellCount`, `height=frameCount` RGBA texture.
+ * - `frameIndex` selects the active frame layer in the texture array.
+ * - `cellTextureWidth` is used to map linear cell index -> texture x/y.
+ * - `healpixFramesTexture` is a folded `2d-array` RGBA texture.
  */
 export type HealpixColorFramesProps = {
   frameIndex: number;
+  cellTextureWidth: number;
   healpixFramesTexture: Texture;
 };
 
@@ -23,9 +25,11 @@ export const healpixColorFramesShaderModule = {
   vs: `\
 uniform healpixColorFramesUniforms {
   int frameIndex;
+  int cellTextureWidth;
 } healpixColorFrames;
 `,
   uniformTypes: {
-    frameIndex: 'i32'
+    frameIndex: 'i32',
+    cellTextureWidth: 'i32'
   }
 } as const satisfies ShaderModule<HealpixColorFramesProps>;

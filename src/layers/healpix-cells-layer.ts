@@ -19,7 +19,7 @@ import { expandArrayBuffer } from '../utils/array-buffer';
 import { computeGeometry } from '../geometry/compute-geometry';
 import { VERTS_PER_CELL } from '../types/layer-props';
 import type { HealpixCellsLayerProps } from '../types/layer-props';
-import { HEALPIX_COLOR_FRAMES_EXTENSION } from './healpix-color-frames-extension';
+import { HEALPIX_COLOR_FRAMES_EXTENSION } from '../extensions/healpix-color-frames-extension';
 
 /** Internal prop subset used by default prop declarations. */
 type _HealpixCellsLayerProps = {
@@ -37,6 +37,7 @@ type HealpixCellsLayerState = {
   triangles: Uint32Array | null;
   cellVertexIndices: Float32Array | null;
   frameTexture: Texture | null;
+  cellTextureWidth: number;
   frameCount: number;
   ready: boolean;
 };
@@ -48,6 +49,8 @@ type TextureData = {
   colors: Uint8Array;
   width: number;
   height: number;
+  depth: number;
+  frameCount: number;
 };
 
 /** Fallback texel when there are no cells or frames. */
@@ -128,6 +131,7 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
       triangles,
       cellVertexIndices,
       frameTexture,
+      cellTextureWidth,
       frameCount,
       ready
     } = this.state;
@@ -145,6 +149,7 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
           id: 'cells',
           frameTexture,
           frameIndex,
+          cellTextureWidth,
           // Preserve user-supplied extensions and append HEALPix texture extension.
           extensions: [
             ...((this.props.extensions as LayerExtension[]) || []),
@@ -175,6 +180,7 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
       triangles: null,
       cellVertexIndices: null,
       frameTexture: null,
+      cellTextureWidth: 1,
       frameCount: 0,
       ready: false
     };
@@ -227,7 +233,6 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   private _updateColorTexture(): void {
     const { cellIds, colorFrames } = this.props;
     const cellCount = cellIds.length;
-    const frameCount = colorFrames.length;
 
     const oldTexture = this.state.frameTexture;
     const data = this._buildTextureData(cellCount, colorFrames);
@@ -235,6 +240,8 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
       id: `${this.id}-color-frames`,
       width: data.width,
       height: data.height,
+      depth: data.depth,
+      dimension: '2d-array',
       format: 'rgba8unorm',
       sampler: {
         minFilter: 'nearest',
@@ -248,7 +255,8 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
 
     this.setState({
       frameTexture: texture,
-      frameCount: cellCount > 0 ? frameCount : 0
+      cellTextureWidth: data.width,
+      frameCount: data.frameCount
     });
 
     oldTexture?.destroy();
@@ -258,9 +266,10 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
    * Pack per-frame color arrays into one contiguous byte array.
    *
    * Texture layout:
-   * - width  = number of cells
-   * - height = number of frames
-   * - texel  = RGBA for a single `(cell, frame)` pair
+   * - width  = folded row width (`<= maxTextureDimension2D`)
+   * - height = rows needed for one frame
+   * - depth  = number of frames (texture array layers)
+   * - texel  = RGBA for one cell in one frame layer
    */
   private _buildTextureData(
     cellCount: number,
@@ -268,11 +277,55 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   ): TextureData {
     const frameCount = colorFrames.length;
     if (cellCount === 0 || frameCount === 0) {
-      return { colors: EMPTY_RGBA_TEXEL, width: 1, height: 1 };
+      return {
+        colors: EMPTY_RGBA_TEXEL,
+        width: 1,
+        height: 1,
+        depth: 1,
+        frameCount: 0
+      };
+    }
+
+    const { maxTextureDimension2D: maxTextureSize, maxTextureArrayLayers } =
+      this.context.device.limits;
+    const width = Math.min(cellCount, maxTextureSize);
+    const height = Math.ceil(cellCount / width);
+
+    if (height > maxTextureSize) {
+      this.raiseError(
+        new Error(
+          `Cannot pack ${cellCount} cells in texture: requires ${width}x${height}, max is ${maxTextureSize}x${maxTextureSize}.`
+        ),
+        'HealpixCellsLayer texture dimensions exceeded'
+      );
+      return {
+        colors: EMPTY_RGBA_TEXEL,
+        width: 1,
+        height: 1,
+        depth: 1,
+        frameCount: 0
+      };
+    }
+
+    if (frameCount > maxTextureArrayLayers) {
+      this.raiseError(
+        new Error(
+          `Cannot upload ${frameCount} frames: max texture array layers is ${maxTextureArrayLayers}.`
+        ),
+        'HealpixCellsLayer texture array depth exceeded'
+      );
+      return {
+        colors: EMPTY_RGBA_TEXEL,
+        width: 1,
+        height: 1,
+        depth: 1,
+        frameCount: 0
+      };
     }
 
     const frameSize = cellCount * 4;
-    const colors = new Uint8Array(cellCount * frameCount * 4);
+    const layerSize = width * height * 4;
+    const colors = new Uint8Array(layerSize * frameCount);
 
     for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
       const frame = colorFrames[frameIndex];
@@ -283,14 +336,30 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
           ),
           'HealpixCellsLayer invalid color frame'
         );
-        return { colors: EMPTY_RGBA_TEXEL, width: 1, height: 1 };
+        return {
+          colors: EMPTY_RGBA_TEXEL,
+          width: 1,
+          height: 1,
+          depth: 1,
+          frameCount: 0
+        };
       }
 
-      const frameOffset = frameIndex * frameSize;
-      colors.set(frame, frameOffset);
+      const frameOffset = frameIndex * layerSize;
+      for (let cellIndex = 0; cellIndex < cellCount; cellIndex++) {
+        const srcOffset = cellIndex * 4;
+        const x = cellIndex % width;
+        const y = Math.floor(cellIndex / width);
+        const dstOffset = frameOffset + (y * width + x) * 4;
+
+        colors[dstOffset] = frame[srcOffset];
+        colors[dstOffset + 1] = frame[srcOffset + 1];
+        colors[dstOffset + 2] = frame[srcOffset + 2];
+        colors[dstOffset + 3] = frame[srcOffset + 3];
+      }
     }
 
-    return { colors, width: cellCount, height: frameCount };
+    return { colors, width, height, depth: frameCount, frameCount };
   }
 
   /**

@@ -46,12 +46,14 @@ const layer = new HealpixCellsLayer({
 
 `HealpixCellsLayer` uploads all provided frames into a single GPU texture:
 
-- texture **width** = `cellIds.length`
-- texture **height** = `colorFrames.length`
-- each texel = one `RGBA` color for one `(cell, frame)` pair
+- texture **width** = folded cell row width (bounded by GPU max texture size)
+- texture **height** = number of folded rows per frame
+- texture **depth** = `colorFrames.length` (one array layer per frame)
+- each texel = one `RGBA` color for one cell in one frame layer
 
-At render time, the layer only changes `currentFrame`, and the shader samples
-the corresponding row from the texture.
+At render time, the layer only changes `currentFrame`, and the shader samples the
+selected texture array layer. This supports large cell counts (e.g. ~200k) by
+folding cells across multiple rows instead of requiring an oversized texture width.
 
 ## API
 

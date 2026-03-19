@@ -8,6 +8,7 @@ import { healpixColorFramesShaderModule } from './healpix-color-frames-shader-mo
 export type HealpixColorFramesExtensionProps = LayerProps & {
   frameTexture: Texture;
   frameIndex: number;
+  cellTextureWidth: number;
 };
 
 /**
@@ -16,7 +17,7 @@ export type HealpixColorFramesExtensionProps = LayerProps & {
  * - Declares the texture binding and the per-vertex cell index attribute.
  */
 const VERTEX_DECLARATION_INJECT = `
-uniform sampler2D healpixFramesTexture;
+uniform mediump sampler2DArray healpixFramesTexture;
 in float healpixCellIndex;
 `;
 
@@ -28,9 +29,11 @@ in float healpixCellIndex;
  */
 const VERTEX_COLOR_FILTER_INJECT = `
 int healpixCell = int(healpixCellIndex + 0.5);
+int healpixX = healpixCell % healpixColorFrames.cellTextureWidth;
+int healpixY = healpixCell / healpixColorFrames.cellTextureWidth;
 vec4 healpixFrameColor = texelFetch(
   healpixFramesTexture,
-  ivec2(healpixCell, healpixColorFrames.frameIndex),
+  ivec3(healpixX, healpixY, healpixColorFrames.frameIndex),
   0
 );
 color = vec4(healpixFrameColor.rgb, healpixFrameColor.a * layer.opacity);
@@ -77,19 +80,20 @@ class HealpixColorFramesExtension extends LayerExtension {
   }
 
   /**
-   * Push per-draw shader inputs (`frameTexture`, `frameIndex`) into all models.
+   * Push per-draw shader inputs (`frameTexture`, `frameIndex`, layout info) into all models.
    */
   draw(
     this: Layer<HealpixColorFramesExtensionProps>,
     _opts: { uniforms: unknown }
   ): void {
     const props = this.props as HealpixColorFramesExtensionProps;
-    const { frameTexture, frameIndex } = props;
+    const { frameTexture, frameIndex, cellTextureWidth } = props;
 
     for (const model of this.getModels()) {
       model.shaderInputs.setProps({
         healpixColorFrames: {
           frameIndex,
+          cellTextureWidth,
           healpixFramesTexture: frameTexture
         }
       });
