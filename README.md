@@ -1,6 +1,7 @@
 # healpix-layers-deck.gl
 
-A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.jpl.nasa.gov/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.
+A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.sourceforge.io/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.  
+It is especially suited for animating a large number of cells.
 
 ## Installation
 
@@ -13,24 +14,17 @@ Peer dependencies (`@deck.gl/core`, `@deck.gl/layers`) must be provided by the h
 ## Usage
 
 ```ts
-import { HealpixCellsLayer } from 'healpix-layers-deck.gl';
+import { HealpixCellsLayer, makeColorFrameFromValues } from 'healpix-layers-deck.gl';
 
 const cellIds = new Int32Array([0, 1, 2, 3]);
 
-// Each frame is one RGBA color per cell in uint8 format (0-255).
-const frame0 = new Uint8Array([
-  255, 0, 0, 255,   // cell 0
-  0, 255, 0, 255,   // cell 1
-  0, 0, 255, 255,   // cell 2
-  255, 255, 0, 255  // cell 3
-]);
+const frame0 = makeColorFrameFromValues(cellIds, (value) =>{
+  return ['#f00', '#0f0', '#00f', '#ff0'][value];
+});
 
-const frame1 = new Uint8Array([
-  255, 255, 255, 255,
-  255, 128, 0, 255,
-  128, 0, 255, 255,
-  0, 255, 255, 255
-]);
+const frame1 = makeColorFrameFromValues(cellIds, (value) =>{
+  return ['#fff', '#888', '#444', '#000'][value];
+});
 
 const layer = new HealpixCellsLayer({
   id: 'healpix',
@@ -42,34 +36,19 @@ const layer = new HealpixCellsLayer({
 });
 ```
 
-### Animation Model
-
-`HealpixCellsLayer` uploads all provided frames into a single GPU texture:
-
-- texture **width** = folded cell row width (bounded by GPU max texture size)
-- texture **height** = number of folded rows per frame
-- texture **depth** = `colorFrames.length` (one array layer per frame)
-- each texel = one `RGBA` color for one cell in one frame layer
-
-At render time, the layer only changes `currentFrame`, and the shader samples the
-selected texture array layer. This supports large cell counts (e.g. ~200k) by
-folding cells across multiple rows instead of requiring an oversized texture width.
-
 ## API
 
 ### `HealpixCellsLayer`
 
 A `CompositeLayer` that renders HEALPix cells as filled polygons.
 
-| Prop | Type | Default | Description |
-| --- | --- | --- | --- |
-| `nside` | `number` | `0` | HEALPix resolution parameter (must be a power of 2). |
-| `cellIds` | `Int32Array` | `Int32Array(0)` | HEALPix cell indices to render. |
-| `scheme` | `'nest' \| 'ring'` | `'nest'` | Pixel numbering scheme. |
-| `colorFrames` | `Uint8Array[]` | `[]` | Color animation frames. Each frame must be `cellIds.length * 4` in RGBA byte order (`0-255`). |
-| `currentFrame` | `number` | `0` | Frame index to render. Values are clamped into valid range. |
-
-All standard deck.gl `CompositeLayer` props (e.g. `visible`, `opacity`, `pickable`) are also accepted.
+| Prop           | Type               | Default         | Description                                                                                   |
+| -------------- | ------------------ | --------------- | --------------------------------------------------------------------------------------------- |
+| `nside`        | `number`           | `0`             | HEALPix resolution parameter (must be a power of 2).                                          |
+| `cellIds`      | `Int32Array`       | `Int32Array(0)` | HEALPix cell indices to render.                                                               |
+| `scheme`       | `'nest' \| 'ring'` | `'nest'`        | Pixel numbering scheme.                                                                       |
+| `colorFrames`  | `Uint8Array[]`     | `[]`            | Color animation frames. Each frame must be `cellIds.length * 4` in RGBA byte order (`0-255`). |
+| `currentFrame` | `number`           | `0`             | Frame index to render. Values are clamped into valid range.                                   |
 
 ### Types
 
