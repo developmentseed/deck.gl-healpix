@@ -2,7 +2,6 @@
  * Geometry generation for a batch of HEALPix cells.
  */
 import { cornersNestLonLat, cornersRingLonLat } from 'healpix-ts';
-import { earcut } from '@math.gl/polygon';
 import type { CellIdArray } from '../types/cell-ids';
 
 self.onmessage = (e: MessageEvent) => {
@@ -27,13 +26,12 @@ self.onmessage = (e: MessageEvent) => {
     const corners = cornersFn(nside, Number(cellIds[i]));
     const poly = corners.concat(corners[0]).flat();
     coords.set(poly, i * 10);
-    indexes[i] = i * 5;
+    const base = i * 5;
+    indexes[i] = base;
 
-    const triangleIdx = earcut(poly);
-    triangles.set(
-      triangleIdx.map((idx) => idx + i * 5),
-      i * 6
-    );
+    // HEALPix cells are always convex quads.
+    // The triangulation is always [0,1,2, 0,2,3]
+    triangles.set([base, base + 1, base + 2, base, base + 2, base + 3], i * 6);
   }
 
   self.postMessage(
