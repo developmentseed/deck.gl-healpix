@@ -1,7 +1,16 @@
-# healpix-layers-deck.gl
+![HEALPix Banner](./docs/healpix-banner.png)
+
+<p align='center'>
+  <a href='https://github.com/developmentseed/healpix-ts'>HEALPix Typescript</a> | <a href='https://github.com/developmentseed/healpix-layers-deck.gl'>HEALPix Deck.gl Layer</a> 
+</p>
+
+
+# HEALPix Deck.gl Layer
 
 A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.sourceforge.io/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.  
 It is especially suited for animating a large number of cells.
+
+![HEALPix Deck.gl Layer](./docs/earth-anim.mp4)
 
 ## Installation
 
@@ -10,6 +19,10 @@ npm install healpix-layers-deck.gl
 ```
 
 Peer dependencies (`@deck.gl/core`, `@deck.gl/layers`) must be provided by the host application.
+
+```bash
+npm install @deck.gl/core @deck.gl/layers
+```
 
 ## Usage
 
