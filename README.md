@@ -10,7 +10,7 @@
 A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.sourceforge.io/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.  
 It is especially suited for animating a large number of cells.
 
-![HEALPix Deck.gl Layer](./docs/earth-anim.mp4)
+https://github.com/user-attachments/assets/4166d5d5-65e3-4309-a63a-0a2d0cdf275d
 
 ## Installation
 
