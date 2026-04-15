@@ -2,9 +2,10 @@
  * HealpixCellsLayer — render arbitrary HEALPix cells by ID.
  *
  * This composite layer is responsible for:
- * - Computing polygon geometry for requested HEALPix cells.
+ * - Splitting cell IDs into GPU-friendly 32-bit halves.
  * - Building a GPU texture that stores all animation frame colors.
- * - Rendering a `SolidPolygonLayer` sublayer that samples colors from texture.
+ * - Rendering a `HealpixCellsPrimitiveLayer` sublayer that draws cells in the
+ *   vertex shader and samples colors from the texture.
  */
 import {
   CompositeLayer,
@@ -13,14 +14,12 @@ import {
   LayerExtension,
   UpdateParameters
 } from '@deck.gl/core';
-import { SolidPolygonLayer } from '@deck.gl/layers';
 import type { Texture } from '@luma.gl/core';
-import { expandArrayBuffer } from '../utils/array-buffer';
-import { computeGeometry } from '../geometry/compute-geometry';
-import { VERTS_PER_CELL } from '../types/layer-props';
+import { splitCellIds } from '../utils/cell-id-split';
+import { HealpixCellsPrimitiveLayer } from './healpix-cells-primitive-layer';
+import { HEALPIX_COLOR_FRAMES_EXTENSION } from '../extensions/healpix-color-frames-extension';
 import type { CellIdArray } from '../types/cell-ids';
 import type { HealpixCellsLayerProps } from '../types/layer-props';
-import { HEALPIX_COLOR_FRAMES_EXTENSION } from '../extensions/healpix-color-frames-extension';
 
 /** Internal prop subset used by default prop declarations. */
 type _HealpixCellsLayerProps = {
@@ -33,14 +32,11 @@ type _HealpixCellsLayerProps = {
 
 /** Runtime state owned by `HealpixCellsLayer`. */
 type HealpixCellsLayerState = {
-  coords: Float32Array | null;
-  indexes: Uint32Array | null;
-  triangles: Uint32Array | null;
-  cellVertexIndices: Uint32Array | null;
+  cellIdLo: Uint32Array;
+  cellIdHi: Uint32Array;
   frameTexture: Texture | null;
   cellTextureWidth: number;
   frameCount: number;
-  ready: boolean;
 };
 
 /**
@@ -72,8 +68,8 @@ const defaultProps: DefaultProps<_HealpixCellsLayerProps> = {
 };
 
 /**
- * Composite layer that renders HEALPix cells as polygons and colors them from
- * a GPU texture containing all animation frames.
+ * Composite layer that renders HEALPix cells on the GPU and colors them from
+ * a texture containing all animation frames.
  */
 export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   static layerName = 'HealpixCellsLayer';
@@ -81,33 +77,29 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
 
   declare state: HealpixCellsLayerState;
 
-  /** Monotonic token used to ignore stale async geometry builds. */
-  private _version = 0;
-
-  /**
-   * Initialize empty state, then kick off initial geometry + color-texture setup.
-   */
   initializeState(): void {
-    this.setState(this._getEmptyState());
-    this._buildGeometry();
+    this.setState({
+      cellIdLo: new Uint32Array(0),
+      cellIdHi: new Uint32Array(0),
+      frameTexture: null,
+      cellTextureWidth: 1,
+      frameCount: 0
+    });
+    this._splitCellIds();
     this._updateColorTexture();
   }
 
-  /** Re-run state updates whenever relevant props or data changed. */
   shouldUpdateState({ changeFlags }: UpdateParameters<this>): boolean {
     return !!changeFlags.propsOrDataChanged;
   }
 
-  /**
-   * Recompute geometry or refresh frame texture depending on prop changes.
-   */
   updateState({ props, oldProps }: UpdateParameters<this>): void {
     if (
       props.cellIds !== oldProps.cellIds ||
       props.nside !== oldProps.nside ||
       props.scheme !== oldProps.scheme
     ) {
-      this._buildGeometry();
+      this._splitCellIds();
     }
     if (
       props.cellIds !== oldProps.cellIds ||
@@ -117,113 +109,54 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
     }
   }
 
-  /** Release GPU resources created by this layer. */
   finalizeState(): void {
     this.state.frameTexture?.destroy();
   }
 
-  /**
-   * Render one `SolidPolygonLayer` sublayer.
-   */
   renderLayers(): Layer[] {
-    const {
-      coords,
-      indexes,
-      triangles,
-      cellVertexIndices,
-      frameTexture,
-      cellTextureWidth,
-      frameCount,
-      ready
-    } = this.state;
-    if (!ready || !coords) return [];
-
-    const { cellIds, currentFrame } = this.props;
+    const { cellIdLo, cellIdHi, frameTexture, cellTextureWidth, frameCount } =
+      this.state;
+    const { cellIds, nside, scheme, currentFrame } = this.props;
     const count = cellIds.length;
-    const frameIndex = this._clampFrameIndex(currentFrame, frameCount);
+    if (count === 0 || !frameTexture) return [];
 
-    if (!frameTexture || !cellVertexIndices) return [];
+    const frameIndex = Math.max(
+      0,
+      Math.min(frameCount - 1, Math.floor(currentFrame))
+    );
 
     return [
-      new SolidPolygonLayer(
+      new HealpixCellsPrimitiveLayer(
         this.getSubLayerProps({
           id: 'cells',
+          nside,
+          scheme,
+          cellIdLo,
+          cellIdHi,
+          instanceCount: count,
           frameTexture,
           frameIndex,
           cellTextureWidth,
-          // Preserve user-supplied extensions and append HEALPix texture extension.
           extensions: [
             ...((this.props.extensions as LayerExtension[]) || []),
             HEALPIX_COLOR_FRAMES_EXTENSION
-          ],
-          data: {
-            length: count,
-            startIndices: indexes,
-            attributes: {
-              getPolygon: { value: coords, size: 2 },
-              indices: { value: triangles, size: 1 },
-              healpixCellIndex: { value: cellVertexIndices, size: 1 }
-            }
-          },
-          _normalize: false
+          ]
         })
       )
     ];
   }
 
-  /**
-   * Create an empty state snapshot used on initialization/reset.
-   */
-  private _getEmptyState(): HealpixCellsLayerState {
-    return {
-      coords: null,
-      indexes: null,
-      triangles: null,
-      cellVertexIndices: null,
-      frameTexture: null,
-      cellTextureWidth: 1,
-      frameCount: 0,
-      ready: false
-    };
-  }
-
-  /**
-   * Compute HEALPix geometry asynchronously.
-   */
-  private async _buildGeometry(): Promise<void> {
-    const { nside, cellIds, scheme } = this.props;
-
-    this.setState({
-      coords: null,
-      indexes: null,
-      triangles: null,
-      cellVertexIndices: null,
-      ready: false
-    });
-
-    if (!cellIds?.length) return;
-
-    const v = ++this._version;
-    const { coords, indexes, triangles } = await computeGeometry(
-      nside,
-      cellIds,
-      scheme
-    );
-    if (this._version !== v) return;
-
-    const cellVertexIndices = expandArrayBuffer(
-      Uint32Array.from({ length: cellIds.length }, (_unused, index) => index),
-      VERTS_PER_CELL,
-      1
-    );
-
-    this.setState({
-      coords,
-      indexes,
-      triangles,
-      cellVertexIndices,
-      ready: true
-    });
+  private _splitCellIds(): void {
+    const { cellIds } = this.props;
+    if (!cellIds?.length) {
+      this.setState({
+        cellIdLo: new Uint32Array(0),
+        cellIdHi: new Uint32Array(0)
+      });
+      return;
+    }
+    const { lo, hi } = splitCellIds(cellIds);
+    this.setState({ cellIdLo: lo, cellIdHi: hi });
   }
 
   /**
@@ -361,13 +294,5 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
     }
 
     return { colors, width, height, depth: frameCount, frameCount };
-  }
-
-  /**
-   * Clamp incoming frame index to valid texture row bounds.
-   */
-  private _clampFrameIndex(currentFrame: number, frameCount: number): number {
-    if (frameCount <= 0) return 0;
-    return Math.max(0, Math.min(frameCount - 1, Math.floor(currentFrame)));
   }
 }

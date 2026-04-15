@@ -14,11 +14,10 @@ export type HealpixColorFramesExtensionProps = LayerProps & {
 /**
  * GLSL declaration injected into the vertex shader.
  *
- * - Declares the texture binding and the per-vertex cell index attribute.
+ * - Declares the texture binding for frame colors.
  */
 const VERTEX_DECLARATION_INJECT = `
 uniform mediump sampler2DArray healpixFramesTexture;
-in float healpixCellIndex;
 `;
 
 /**
@@ -28,7 +27,7 @@ in float healpixCellIndex;
  * `(cellIndex, frameIndex)` texel.
  */
 const VERTEX_COLOR_FILTER_INJECT = `
-int healpixCell = int(healpixCellIndex + 0.5);
+int healpixCell = gl_InstanceID;
 int healpixX = healpixCell % healpixColorFrames.cellTextureWidth;
 int healpixY = healpixCell / healpixColorFrames.cellTextureWidth;
 vec4 healpixFrameColor = texelFetch(
@@ -43,28 +42,12 @@ color = vec4(healpixFrameColor.rgb, healpixFrameColor.a * layer.opacity);
  * Layer extension that enables texture-driven color animation for HEALPix cells.
  *
  * It:
- * 1. Adds a custom per-vertex `healpixCellIndex` attribute.
+ * 1. Uses `gl_InstanceID` as the cell index (one instance per HEALPix cell).
  * 2. Injects shader code to fetch color from a `(cell, frame)` texture.
  * 3. Binds frame texture + frame index each draw.
  */
 class HealpixColorFramesExtension extends LayerExtension {
   static extensionName = 'HealpixColorFramesExtension';
-
-  /**
-   * Register the `healpixCellIndex` attribute expected by shader injections.
-   */
-  initializeState(this: Layer): void {
-    this.getAttributeManager()?.add({
-      healpixCellIndex: {
-        size: 1,
-        type: 'float32',
-        stepMode: 'dynamic',
-        accessor: 'healpixCellIndex',
-        defaultValue: 0,
-        noAlloc: true
-      }
-    });
-  }
 
   /**
    * Add shader module and shader injection hooks.

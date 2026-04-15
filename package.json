@@ -59,7 +59,8 @@
     "ts-node": "^10.9.2",
     "tslib": "^2.8.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.54.0"
+    "typescript-eslint": "^8.54.0",
+    "healpix-ts": "^1.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -69,14 +70,10 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./worker": "./dist/tile-grid.worker.js"
+    }
   },
   "peerDependencies": {
     "@deck.gl/core": "^9.2.11",
-    "@deck.gl/layers": "^9.2.11"
-  },
-  "dependencies": {
-    "healpix-ts": "^1.0.0"
+    "@luma.gl/engine": "^9.2.6"
   }
 }
