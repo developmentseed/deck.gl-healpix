@@ -14,11 +14,14 @@ export type HealpixColorExtensionProps = LayerProps & {
 
 /**
  * GLSL declaration injected into the vertex shader.
- * Declares the two texture samplers used for color computation.
+ *
+ * Declares the two texture samplers plus the per-vertex `healpixCellIndex`
+ * attribute used to look the per-cell float values up in the values texture.
  */
 const VERTEX_DECLARATION_INJECT = `
 uniform highp sampler2D healpixValuesTexture;
 uniform mediump sampler2D healpixColorMapTexture;
+in float healpixCellIndex;
 `;
 
 /**
@@ -34,7 +37,7 @@ uniform mediump sampler2D healpixColorMapTexture;
  *   else          transparent (reserved for future band math)
  */
 const VERTEX_COLOR_FILTER_INJECT = `
-int healpixCell = gl_InstanceID;
+int healpixCell = int(healpixCellIndex + 0.5);
 int healpixX = healpixCell % healpixColor.uValuesWidth;
 int healpixY = healpixCell / healpixColor.uValuesWidth;
 vec4 healpixVals = texelFetch(healpixValuesTexture, ivec2(healpixX, healpixY), 0);
@@ -69,6 +72,24 @@ color = vec4(healpixOut.rgb, healpixOut.a * layer.opacity);
  */
 class HealpixColorExtension extends LayerExtension {
   static extensionName = 'HealpixColorExtension';
+
+  /**
+   * Register the per-vertex `healpixCellIndex` attribute expected by the
+   * shader injection. The host layer is responsible for supplying the
+   * attribute values (one per vertex).
+   */
+  initializeState(this: Layer): void {
+    this.getAttributeManager()?.add({
+      healpixCellIndex: {
+        size: 1,
+        type: 'float32',
+        stepMode: 'vertex',
+        accessor: 'healpixCellIndex',
+        defaultValue: 0,
+        noAlloc: true
+      }
+    });
+  }
 
   getShaders(): unknown {
     return {
