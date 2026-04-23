@@ -29,11 +29,12 @@ void main() {
   int iy = int(fxy.z);
 
   int ci = gl_VertexID % 4;
-  int cx = ix + ((ci == 0 || ci == 3) ? 1 : 0);
-  int cy = iy + ((ci == 0 || ci == 1) ? 1 : 0);
 
+  // Pass (ix, iy, ci) so fxyCorner can wrap the cell's k-anchor once and
+  // let each corner ride along as k_anchor + dk (dk ∈ {-1, 0, +1}). Keeps
+  // the quad tight in lon even when the cell crosses the antimeridian.
   vec2 lon_rad_fp, lat_rad_fp;
-  fxyCorner(face, cx, cy, int(healpixCells.nside), lon_rad_fp, lat_rad_fp);
+  fxyCorner(face, ix, iy, ci, int(healpixCells.nside), lon_rad_fp, lat_rad_fp);
 
   vec2 deg_per_rad = _div64(vec2(180.0, 0.0), PI64);
   vec2 lat_deg_fp  = _mul64(lat_rad_fp, deg_per_rad);

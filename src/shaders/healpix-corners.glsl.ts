@@ -1,19 +1,25 @@
 /**
- * Corner-expansion math: (face, cx, cy, nside) → (lon_rad_fp, lat_rad_fp).
+ * Corner-expansion math: (face, ix, iy, ci, nside) → (lon_rad_fp, lat_rad_fp).
  *
- * Takes integer-lattice corner coordinates `(cx, cy)` = `(ix + {0,1}, iy + {0,1})`
- * and emits the spherical lon/lat for that corner in fp64 (vec2 = (hi, lo)).
+ * Takes a pixel (ix, iy) plus a corner index ci ∈ {0..3} (N/W/S/E) and emits
+ * the spherical lon/lat for that corner in fp64 (vec2 = (hi, lo)).
+ *
+ * Corner delivery is anchored: k_anchor (the cell's SW corner, ci=2) is
+ * reduced once to (-4·nside, 4·nside], then each corner rides along at
+ * k_anchor + dk with dk ∈ {-1, 0, +1}. All four corners of a cell stay
+ * within ±1 of each other in k-space, so quads straddling the antimeridian
+ * render as tight polygons with at most one corner sitting just past ±π.
  *
  * Uses fxy2tu → tu2za composition. Inner branches:
  *   - polar cap   (|u| > π/4): half-angle asin identity + Newton refinement
  *   - equatorial  (|u| ≤ π/4): direct z = (8/3π)·u, asin + Newton refinement
- *   - exact pole  (|u| ≥ π/2): lat = ±π/2, lon = 0
+ *   - exact pole  (|u| ≥ π/2): lat = ±π/2, lon = cell-center lon (via k_anchor)
  *
  * Depends on fp64.glsl.ts for the Dekker primitives and π constants.
  */
 export const HEALPIX_CORNERS_GLSL: string = /* glsl */ `
 void fxyCorner(
-  int face, int cx, int cy, int nside,
+  int face, int ix, int iy, int ci, int nside,
   out vec2 lon_rad_fp, out vec2 lat_rad_fp
 ) {
   // integer fxy2tu (exact)
@@ -21,22 +27,40 @@ void fxyCorner(
   int f1 = f_row + 2;
   int f2 = 2 * (face - 4 * f_row) - (f_row & 1) + 1;
 
-  // Intentionally omits the -1 that healpix-ts fxy2tu has. fxy2tu returns the
-  // *center* of pixel (cx, cy); we want the four *corners* of pixel (ix, iy).
-  // Using integer (cx, cy) = (ix + {0,1}, iy + {0,1}) with this formula, the
-  // quad's four vertices land at (t0, u0±d) and (t0±d, u0) — exactly the N/W/S/E
-  // cardinal corners produced by healpix-ts fxyCorners. Adding a -1 here would
-  // shift every corner by +d in u, translating the whole cell half a pixel north.
-  int i_ring = f1 * nside - cx - cy;
-  int k_ring = f2 * nside + (cx - cy) + 8 * nside;
+  // Per-corner deltas from the pixel's (ix, iy) anchor (= the ci=2 / SW
+  // corner). Taking (cx, cy) = (ix + {0,1}, iy + {0,1}) through the no-(-1)
+  // fxy2tu formula below gives:
+  //   ci=0 (N, cx=ix+1, cy=iy+1):  di = -2, dk =  0
+  //   ci=1 (W, cx=ix,   cy=iy+1):  di = -1, dk = -1
+  //   ci=2 (S, cx=ix,   cy=iy  ):  di =  0, dk =  0
+  //   ci=3 (E, cx=ix+1, cy=iy  ):  di = -1, dk = +1
+  // (Intentionally omits the -1 that healpix-ts fxy2tu has — that offset is
+  // for pixel *centers*; we want corners of pixel (ix, iy), so going through
+  // integer cx/cy and this formula yields N/W/S/E exactly. Adding the -1 back
+  // would shift every corner half a pixel north.)
+  int di = (ci == 0) ? -2 : ((ci == 2) ? 0 : -1);
+  int dk = (ci == 1) ? -1 : ((ci == 3) ? 1 : 0);
 
-  // Wrap k_ring to (-4*nside, 4*nside] in integer space so t = k_ring·π/(4·nside)
-  // stays in (-π, π]. Since 8·nside · π/(4·nside) = 2π *exactly*, this wrap is
-  // bit-exact — it avoids the catastrophic cancellation that killed precision
-  // when t_fp reached ~12 rad before being reduced to ~0.16 rad.
+  int i_anchor = f1 * nside - ix - iy;
+  int k_anchor = f2 * nside + (ix - iy) + 8 * nside;
+
+  // Wrap the cell anchor's k_ring once to (-4·nside, 4·nside]. Every corner
+  // then rides along as k_anchor + dk (dk ∈ {-1, 0, +1}), so the four
+  // corners of a cell stay within ±1 of each other in k-space. A cell
+  // crossing the antimeridian has one corner sitting just past ±π and the
+  // rest just inside — deck.gl's Mercator draws that as a tight quad
+  // spanning the dateline.
+  //
+  // Since 8·nside · π/(4·nside) = 2π *exactly*, the wrap is bit-exact. It
+  // keeps t_fp bounded near the anchor, avoiding the catastrophic
+  // cancellation we'd see if t_fp grew to ~12 rad before being reduced to
+  // ~0.16 rad.
   int period = 8 * nside;
-  k_ring = k_ring - (k_ring / period) * period;
-  if (k_ring > 4 * nside) k_ring -= period;
+  k_anchor = k_anchor - (k_anchor / period) * period;
+  if (k_anchor > 4 * nside) k_anchor -= period;
+
+  int k_ring = k_anchor + dk;
+  int i_ring = i_anchor + di;
 
   // Split k_ring = k_int * nside + k_rem. nside is a power of two so
   // k_rem / nside is exact in fp32.
@@ -63,10 +87,21 @@ void fxyCorner(
   float abs_u = abs(u_hi);
 
   if (abs_u >= PI2_64.x) {
-    // Pole exactly: lat = ±π/2 with the full fp64 residual; lon = 0.
+    // Exact pole: lat = ±π/2 with full fp64 residual. All meridians meet at
+    // the pole so lon is geometrically arbitrary, but the four corners of
+    // a pole cell need a single agreed lon to draw a proper wedge. Use the
+    // cell center's lon: k_anchor · π/(4·nside). k_anchor is the center's
+    // k — the ±0.5 pixel offsets in cx/cy cancel in the k = cx - cy
+    // formula, so the diamond's midpoint sits at (k_anchor, i_anchor - 1).
     float sgn = sign(u_hi);
     lat_rad_fp = vec2(sgn * PI2_64.x, sgn * PI2_64.y);
-    lon_rad_fp = vec2(0.0);
+
+    int kc_int = k_anchor / nside;
+    int kc_rem = k_anchor - kc_int * nside;
+    float kc_frac = float(kc_rem) / float(nside);
+    vec2 t_center = _mul64f(PI4_64, float(kc_int));
+    t_center      = _add64(t_center, _mul64f(PI4_64, kc_frac));
+    lon_rad_fp = t_center;
   } else if (abs_u <= PI4_64.x) {
     // Equatorial: z = (8/3π)·u in fp64, a = t in fp64, then asin(z) with
     // one Newton step (GLSL spec: asin ≤ 4 ULPs, sin/cos ≤ 4 ULPs each).
@@ -140,8 +175,9 @@ void fxyCorner(
     lon_rad_fp = vec2(a_f, 0.0);
   }
 
-  // lon_rad is already in (-π, π] thanks to the integer k_ring wrap above,
-  // so no Dekker-subtraction of 2π is needed — that step would introduce
-  // cancellation noise we can't afford.
+  // lon_rad lies in (-π - π/(4·nside), π + π/(4·nside)]. A cell straddling
+  // the antimeridian has its E or W corner sitting just past ±π, which
+  // deck.gl's Mercator handles fine. No Dekker subtraction of 2π is needed
+  // — that would introduce cancellation noise we can't afford.
 }
 `;
