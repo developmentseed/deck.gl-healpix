@@ -186,7 +186,10 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
       return;
     }
     const { cellIdLo, cellIdHi } = splitCellIds(cellIds);
-    const cellIndex = Float32Array.from({ length: cellIds.length }, (_, i) => i);
+    const cellIndex = Float32Array.from(
+      { length: cellIds.length },
+      (_, i) => i
+    );
     this.setState({ cellIdLo, cellIdHi, cellIndex });
   }
 

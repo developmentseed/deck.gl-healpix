@@ -6,8 +6,8 @@ import {
   project32,
   UpdateParameters
 } from '@deck.gl/core';
+import { RenderPass } from '@luma.gl/core';
 import { Geometry, Model } from '@luma.gl/engine';
-import type { RenderPass } from '@luma.gl/core';
 import { HEALPIX_FRAGMENT_SHADER, HEALPIX_VERTEX_SHADER } from '../shaders';
 import {
   computeHealpixCellsUniforms,
@@ -22,12 +22,10 @@ export type HealpixCellsPrimitiveLayerProps = {
   instanceCount: number;
 };
 
-type _HealpixCellsPrimitiveLayerProps = HealpixCellsPrimitiveLayerProps;
-
-type HealpixCellsPrimitiveLayerMergedProps = _HealpixCellsPrimitiveLayerProps &
+type HealpixCellsPrimitiveLayerMergedProps = HealpixCellsPrimitiveLayerProps &
   HealpixColorExtensionProps;
 
-const defaultProps: DefaultProps<_HealpixCellsPrimitiveLayerProps> = {
+const defaultProps: DefaultProps<HealpixCellsPrimitiveLayerProps> = {
   nside: { type: 'number', value: 1 },
   // @ts-expect-error deck.gl DefaultProps has no 'string' type.
   scheme: { type: 'string', value: 'nest' },
@@ -63,7 +61,7 @@ export class HealpixCellsPrimitiveLayer extends Layer<HealpixCellsPrimitiveLayer
     });
   }
 
-  updateState(params: UpdateParameters<this>): void {
+  updateState(params: UpdateParameters<HealpixCellsPrimitiveLayer>): void {
     super.updateState(params);
     if (params.changeFlags.extensionsChanged || !this.state.model) {
       this.state.model?.destroy();
@@ -77,7 +75,8 @@ export class HealpixCellsPrimitiveLayer extends Layer<HealpixCellsPrimitiveLayer
     this.state.model?.destroy();
   }
 
-  draw({ renderPass }: { renderPass: RenderPass }): void {
+  draw(opts: { renderPass: RenderPass }): void {
+    const { renderPass } = opts;
     const { model } = this.state;
     if (!model || this.props.instanceCount === 0) return;
 

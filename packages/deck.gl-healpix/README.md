@@ -20,7 +20,7 @@ npm install @developmentseed/deck.gl-healpix
 Peer dependencies (`@deck.gl/core`, `@deck.gl/layers`) must be provided by the host application.
 
 ```bash
-npm install @deck.gl/core @deck.gl/layers
+npm install @deck.gl/core @deck.gl/layers @luma.gl/core @luma.gl/engine
 ```
 
 ## Usage
