@@ -1,10 +1,6 @@
 /**
- * HealpixCellsLayer — render arbitrary HEALPix cells by ID.
- *
- * This composite layer is responsible for:
- * - Computing polygon geometry for requested HEALPix cells.
- * - Building a GPU texture that stores all animation frame colors.
- * - Rendering a `SolidPolygonLayer` sublayer that samples colors from texture.
+ * HealpixCellsLayer — render arbitrary HEALPix cells by ID with GPU color
+ * computation.
  */
 import {
   CompositeLayer,
@@ -17,63 +13,59 @@ import { SolidPolygonLayer } from '@deck.gl/layers';
 import type { Texture } from '@luma.gl/core';
 import { expandArrayBuffer } from '../utils/array-buffer';
 import { computeGeometry } from '../geometry/compute-geometry';
-import { VERTS_PER_CELL } from '../types/layer-props';
+import { HEALPIX_COLOR_EXTENSION } from '../extensions/healpix-color-extension';
+import { resolveFrame, type ResolvedFrame } from '../utils/resolve-frame';
+import { packValuesData } from '../utils/values-texture';
 import type { CellIdArray } from '../types/cell-ids';
-import type { HealpixCellsLayerProps } from '../types/layer-props';
-import { HEALPIX_COLOR_FRAMES_EXTENSION } from '../extensions/healpix-color-frames-extension';
+import {
+  VERTS_PER_CELL,
+  type HealpixCellsLayerProps,
+  type HealpixFrameObject
+} from '../types/layer-props';
 
-/** Internal prop subset used by default prop declarations. */
 type _HealpixCellsLayerProps = {
   nside: number;
   cellIds: CellIdArray;
   scheme: 'nest' | 'ring';
-  colorFrames: Uint8Array[];
+  values: ArrayLike<number> | null;
+  min: number;
+  max: number;
+  dimensions: 1 | 2 | 3 | 4;
+  colorMap: Uint8Array | null;
+  frames: HealpixFrameObject[] | null;
   currentFrame: number;
 };
 
-/** Runtime state owned by `HealpixCellsLayer`. */
 type HealpixCellsLayerState = {
   coords: Float32Array | null;
   indexes: Uint32Array | null;
   triangles: Uint32Array | null;
-  cellVertexIndices: Uint32Array | null;
-  frameTexture: Texture | null;
-  cellTextureWidth: number;
-  frameCount: number;
+  cellVertexIndices: Float32Array | null;
+  valuesTexture: Texture | null;
+  colorMapTexture: Texture | null;
+  valuesTextureWidth: number;
   ready: boolean;
+  /** Last resolved frame — used for change detection in updateState. */
+  prevResolved: ResolvedFrame | null;
 };
 
-/**
- * Return shape for packed texture data that is uploaded to the GPU.
- */
-type TextureData = {
-  colors: Uint8Array;
-  width: number;
-  height: number;
-  depth: number;
-  frameCount: number;
-};
-
-/** Fallback texel when there are no cells or frames. */
-const EMPTY_RGBA_TEXEL = new Uint8Array([0, 0, 0, 0]);
-
-/** deck.gl-style default props for the composite layer. */
 const defaultProps: DefaultProps<_HealpixCellsLayerProps> = {
   nside: { type: 'number', value: 0 },
   cellIds: { type: 'object', value: new Uint32Array(0), compare: true },
   // @ts-expect-error deck.gl DefaultProps has no 'string' type.
   scheme: { type: 'string', value: 'nest' },
-  colorFrames: {
-    type: 'object',
-    value: [],
-    compare: true
-  },
+  values: { type: 'object', value: null, compare: true },
+  min: { type: 'number', value: 0 },
+  max: { type: 'number', value: 1 },
+  dimensions: { type: 'number', value: 1 },
+  colorMap: { type: 'object', value: null, compare: true },
+  frames: { type: 'object', value: null, compare: true },
   currentFrame: { type: 'number', value: 0 }
 };
 
 /**
- * Composite layer that renders HEALPix cells as polygons and colors them from
- * a GPU texture containing all animation frames.
+ * Composite layer that renders HEALPix cells as polygons whose colors are
+ * computed on the GPU from per-cell float values and a colorMap LUT.
  */
 export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   static layerName = 'HealpixCellsLayer';
@@ -84,77 +76,85 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   /** Monotonic token used to ignore stale async geometry builds. */
   private _version = 0;
 
-  /**
-   * Initialize empty state, then kick off initial geometry + color-texture setup.
-   */
   initializeState(): void {
     this.setState(this._getEmptyState());
-    this._buildGeometry();
-    this._updateColorTexture();
+    this._rebuildAll();
   }
 
-  /** Re-run state updates whenever relevant props or data changed. */
   shouldUpdateState({ changeFlags }: UpdateParameters<this>): boolean {
     return !!changeFlags.propsOrDataChanged;
   }
 
-  /**
-   * Recompute geometry or refresh frame texture depending on prop changes.
-   */
-  updateState({ props, oldProps }: UpdateParameters<this>): void {
-    if (
-      props.cellIds !== oldProps.cellIds ||
-      props.nside !== oldProps.nside ||
-      props.scheme !== oldProps.scheme
-    ) {
-      this._buildGeometry();
+  updateState({ props }: UpdateParameters<this>): void {
+    let resolved: ResolvedFrame;
+    try {
+      resolved = resolveFrame(props);
+    } catch (e) {
+      this.raiseError(e as Error, 'HealpixCellsLayer frame resolution failed');
+      return;
     }
-    if (
-      props.cellIds !== oldProps.cellIds ||
-      props.colorFrames !== oldProps.colorFrames
-    ) {
-      this._updateColorTexture();
-    }
+
+    const prev = this.state.prevResolved;
+
+    const geometryChanged =
+      !prev ||
+      resolved.cellIds !== prev.cellIds ||
+      resolved.nside !== prev.nside ||
+      resolved.scheme !== prev.scheme;
+
+    const valuesChanged =
+      !prev ||
+      resolved.values !== prev.values ||
+      resolved.dimensions !== prev.dimensions ||
+      resolved.cellIds.length !== prev.cellIds.length;
+
+    const colorMapChanged = !prev || resolved.colorMap !== prev.colorMap;
+
+    if (geometryChanged) this._buildGeometry(resolved);
+    if (valuesChanged || geometryChanged) this._updateValuesTexture(resolved);
+    if (colorMapChanged) this._updateColorMapTexture(resolved);
+
+    this.setState({ prevResolved: resolved });
   }
 
-  /** Release GPU resources created by this layer. */
   finalizeState(): void {
-    this.state.frameTexture?.destroy();
+    this.state.valuesTexture?.destroy();
+    this.state.colorMapTexture?.destroy();
   }
 
-  /**
-   * Render one `SolidPolygonLayer` sublayer.
-   */
   renderLayers(): Layer[] {
     const {
       coords,
       indexes,
       triangles,
       cellVertexIndices,
-      frameTexture,
-      cellTextureWidth,
-      frameCount,
-      ready
+      valuesTexture,
+      colorMapTexture,
+      valuesTextureWidth,
+      ready,
+      prevResolved
     } = this.state;
-    if (!ready || !coords) return [];
 
-    const { cellIds, currentFrame } = this.props;
+    if (!ready || !coords || !cellVertexIndices) return [];
+    if (!valuesTexture || !colorMapTexture || !prevResolved) return [];
+
+    const { cellIds, min, max, dimensions } = prevResolved;
     const count = cellIds.length;
-    const frameIndex = this._clampFrameIndex(currentFrame, frameCount);
-
-    if (!frameTexture || !cellVertexIndices) return [];
+    if (count === 0) return [];
 
     return [
       new SolidPolygonLayer(
         this.getSubLayerProps({
           id: 'cells',
-          frameTexture,
-          frameIndex,
-          cellTextureWidth,
-          // Preserve user-supplied extensions and append HEALPix texture extension.
+          valuesTexture,
+          colorMapTexture,
+          uMin: min,
+          uMax: max,
+          uDimensions: dimensions,
+          uValuesWidth: valuesTextureWidth,
           extensions: [
             ...((this.props.extensions as LayerExtension[]) || []),
-            HEALPIX_COLOR_FRAMES_EXTENSION
+            HEALPIX_COLOR_EXTENSION
           ],
           data: {
             length: count,
@@ -172,26 +172,41 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   }
 
   /**
-   * Create an empty state snapshot used on initialization/reset.
+   * Rebuild all resources from scratch (called on first init, before
+   * `updateState` has a chance to diff).
    */
+  private _rebuildAll(): void {
+    let resolved: ResolvedFrame;
+    try {
+      resolved = resolveFrame(this.props);
+    } catch (e) {
+      this.raiseError(e as Error, 'HealpixCellsLayer frame resolution failed');
+      return;
+    }
+    this._buildGeometry(resolved);
+    this._updateValuesTexture(resolved);
+    this._updateColorMapTexture(resolved);
+    this.setState({ prevResolved: resolved });
+  }
+
+  /** Create an empty state snapshot used on initialization/reset. */
   private _getEmptyState(): HealpixCellsLayerState {
     return {
       coords: null,
       indexes: null,
       triangles: null,
       cellVertexIndices: null,
-      frameTexture: null,
-      cellTextureWidth: 1,
-      frameCount: 0,
-      ready: false
+      valuesTexture: null,
+      colorMapTexture: null,
+      valuesTextureWidth: 1,
+      ready: false,
+      prevResolved: null
     };
   }
 
-  /**
-   * Compute HEALPix geometry asynchronously.
-   */
-  private async _buildGeometry(): Promise<void> {
-    const { nside, cellIds, scheme } = this.props;
+  /** Compute HEALPix polygon geometry asynchronously. */
+  private async _buildGeometry(resolved: ResolvedFrame): Promise<void> {
+    const { nside, cellIds, scheme } = resolved;
 
     this.setState({
       coords: null,
@@ -211,8 +226,12 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
     );
     if (this._version !== v) return;
 
+    const perCellIndex = Float32Array.from(
+      { length: cellIds.length },
+      (_unused, index) => index
+    );
     const cellVertexIndices = expandArrayBuffer(
-      Uint32Array.from({ length: cellIds.length }, (_unused, index) => index),
+      perCellIndex,
       VERTS_PER_CELL,
       1
     );
@@ -227,22 +246,70 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
   }
 
   /**
-   * Build and upload the `(cell, frame) -> RGBA` texture to the GPU.
+   * Build and upload an RGBA32F values texture.
    *
-   * The previous texture is destroyed once the new one is ready.
+   * Each texel stores the float values for one cell in channels 0–
+   * (dimensions-1). The texture is folded: cell i → texel (i % width,
+   * floor(i / width)).
    */
-  private _updateColorTexture(): void {
-    const { cellIds, colorFrames } = this.props;
+  private _updateValuesTexture(resolved: ResolvedFrame): void {
+    const { values, dimensions, cellIds } = resolved;
     const cellCount = cellIds.length;
+    const oldTexture = this.state.valuesTexture;
 
-    const oldTexture = this.state.frameTexture;
-    const data = this._buildTextureData(cellCount, colorFrames);
+    const { maxTextureDimension2D: maxTextureSize } =
+      this.context.device.limits;
+    const { data, width, height } = packValuesData(
+      values,
+      dimensions,
+      cellCount,
+      maxTextureSize
+    );
+
+    if (height > maxTextureSize) {
+      this.raiseError(
+        new Error(
+          `Cannot pack ${cellCount} cells in values texture: requires ${width}×${height}, max is ${maxTextureSize}×${maxTextureSize}.`
+        ),
+        'HealpixCellsLayer values texture dimensions exceeded'
+      );
+      return;
+    }
+
     const texture = this.context.device.createTexture({
-      id: `${this.id}-color-frames`,
-      width: data.width,
-      height: data.height,
-      depth: data.depth,
-      dimension: '2d-array',
+      id: `${this.id}-values`,
+      width,
+      height,
+      dimension: '2d',
+      format: 'rgba32float',
+      sampler: {
+        minFilter: 'nearest',
+        magFilter: 'nearest',
+        mipmapFilter: 'none',
+        addressModeU: 'clamp-to-edge',
+        addressModeV: 'clamp-to-edge'
+      }
+    });
+    texture.copyImageData({ data });
+
+    this.setState({ valuesTexture: texture, valuesTextureWidth: width });
+    oldTexture?.destroy();
+  }
+
+  /**
+   * Build and upload an RGBA8 256×1 colorMap texture.
+   *
+   * Index 0 maps to `min`, index 255 maps to `max`.
+   */
+  private _updateColorMapTexture(resolved: ResolvedFrame): void {
+    const { colorMap } = resolved;
+    const oldTexture = this.state.colorMapTexture;
+
+    const texture = this.context.device.createTexture({
+      id: `${this.id}-colormap`,
+      width: 256,
+      height: 1,
+      dimension: '2d',
       format: 'rgba8unorm',
       sampler: {
         minFilter: 'nearest',
@@ -252,122 +319,9 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
         addressModeV: 'clamp-to-edge'
       }
     });
-    texture.copyImageData({ data: data.colors });
+    texture.copyImageData({ data: colorMap });
 
-    this.setState({
-      frameTexture: texture,
-      cellTextureWidth: data.width,
-      frameCount: data.frameCount
-    });
-
+    this.setState({ colorMapTexture: texture });
     oldTexture?.destroy();
-  }
-
-  /**
-   * Pack per-frame color arrays into one contiguous byte array.
-   *
-   * Texture layout:
-   * - width  = folded row width (`<= maxTextureDimension2D`)
-   * - height = rows needed for one frame
-   * - depth  = number of frames (texture array layers)
-   * - texel  = RGBA for one cell in one frame layer
-   */
-  private _buildTextureData(
-    cellCount: number,
-    colorFrames: Uint8Array[]
-  ): TextureData {
-    const frameCount = colorFrames.length;
-    if (cellCount === 0 || frameCount === 0) {
-      return {
-        colors: EMPTY_RGBA_TEXEL,
-        width: 1,
-        height: 1,
-        depth: 1,
-        frameCount: 0
-      };
-    }
-
-    const { maxTextureDimension2D: maxTextureSize, maxTextureArrayLayers } =
-      this.context.device.limits;
-    const width = Math.min(cellCount, maxTextureSize);
-    const height = Math.ceil(cellCount / width);
-
-    if (height > maxTextureSize) {
-      this.raiseError(
-        new Error(
-          `Cannot pack ${cellCount} cells in texture: requires ${width}x${height}, max is ${maxTextureSize}x${maxTextureSize}.`
-        ),
-        'HealpixCellsLayer texture dimensions exceeded'
-      );
-      return {
-        colors: EMPTY_RGBA_TEXEL,
-        width: 1,
-        height: 1,
-        depth: 1,
-        frameCount: 0
-      };
-    }
-
-    if (frameCount > maxTextureArrayLayers) {
-      this.raiseError(
-        new Error(
-          `Cannot upload ${frameCount} frames: max texture array layers is ${maxTextureArrayLayers}.`
-        ),
-        'HealpixCellsLayer texture array depth exceeded'
-      );
-      return {
-        colors: EMPTY_RGBA_TEXEL,
-        width: 1,
-        height: 1,
-        depth: 1,
-        frameCount: 0
-      };
-    }
-
-    const frameSize = cellCount * 4;
-    const layerSize = width * height * 4;
-    const colors = new Uint8Array(layerSize * frameCount);
-
-    for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
-      const frame = colorFrames[frameIndex];
-      if (frame.length !== frameSize) {
-        this.raiseError(
-          new Error(
-            `Frame ${frameIndex} has ${frame.length} values; expected ${frameSize}.`
-          ),
-          'HealpixCellsLayer invalid color frame'
-        );
-        return {
-          colors: EMPTY_RGBA_TEXEL,
-          width: 1,
-          height: 1,
-          depth: 1,
-          frameCount: 0
-        };
-      }
-
-      const frameOffset = frameIndex * layerSize;
-      for (let cellIndex = 0; cellIndex < cellCount; cellIndex++) {
-        const srcOffset = cellIndex * 4;
-        const x = cellIndex % width;
-        const y = Math.floor(cellIndex / width);
-        const dstOffset = frameOffset + (y * width + x) * 4;
-
-        colors[dstOffset] = frame[srcOffset];
-        colors[dstOffset + 1] = frame[srcOffset + 1];
-        colors[dstOffset + 2] = frame[srcOffset + 2];
-        colors[dstOffset + 3] = frame[srcOffset + 3];
-      }
-    }
-
-    return { colors, width, height, depth: frameCount, frameCount };
-  }
-
-  /**
-   * Clamp incoming frame index to valid texture row bounds.
-   */
-  private _clampFrameIndex(currentFrame: number, frameCount: number): number {
-    if (frameCount <= 0) return 0;
-    return Math.max(0, Math.min(frameCount - 1, Math.floor(currentFrame)));
   }
 }

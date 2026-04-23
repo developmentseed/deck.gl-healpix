@@ -1,21 +1,35 @@
 /**
- * Utilities to build per-cell RGBA color frames (Uint8Array, 0–255) from a callback.
- *
- * Callback results may be:
- * - A CSS-like hex string (`#RGB`, `#RRGGBB`, `#RRGGBBAA`)
- * - A 3- or 4-tuple of byte values (0–255)
- * - A normalized color: `{ normalized: true, rgba: [r,g,b] | [r,g,b,a] }` with channels in 0–1
+ * Validates that `colorMap` is exactly 256 × 4 = 1024 bytes.
+ * Throws with a descriptive message if not.
  */
+export function validateColorMap(colorMap: Uint8Array): void {
+  if (colorMap.length !== 1024) {
+    throw new Error(
+      `HealpixCellsLayer: colorMap must be exactly 256 × 4 = 1024 bytes, got ${colorMap.length}`
+    );
+  }
+}
 
+// The following types are the same, but used for clarity in the docs.
+/** RGB or RGBA channels in 0–255. */
 export type Uint8ColorArray =
   | readonly [number, number, number]
   | readonly [number, number, number, number];
 
+/** RGB or RGBA channels in 0–1. */
 export type NormalizedColorArray =
   | readonly [number, number, number]
   | readonly [number, number, number, number];
 
-export type ColorFrameCallbackValue =
+/**
+ * A value returned from the `makeColorMap` callback.
+ *
+ * Can be:
+ *  - A CSS-like hex string (`#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`).
+ *  - A 3- or 4-tuple of bytes (`0`–`255`).
+ *  - `{ normalized: true, rgba: [...] }` with channels in `0`–`1`.
+ */
+export type ColorMapCallbackValue =
   | string
   | Uint8ColorArray
   | { readonly normalized: true; readonly rgba: NormalizedColorArray };
@@ -30,11 +44,9 @@ function clampUnit(n: number): number {
 
 /**
  * Parse a hex color string into RGBA bytes (0–255).
- * Supports `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` (optional leading `#`).
+ * Supports `#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA` (leading `#` optional).
  */
-export function parseHexColorToRgba255(
-  hex: string
-): [number, number, number, number] {
+function parseHexColorToRgba255(hex: string): [number, number, number, number] {
   let s = hex.trim();
   if (s.startsWith('#')) s = s.slice(1);
 
@@ -69,11 +81,9 @@ export function parseHexColorToRgba255(
   throw new Error(`Invalid hex color: ${hex}`);
 }
 
-/**
- * Normalize any supported callback color value to RGBA in 0–255.
- */
-export function normalizeColorFrameValue(
-  value: ColorFrameCallbackValue
+/** Normalize any supported callback color value to RGBA in 0–255. */
+function normalizeCallbackValue(
+  value: ColorMapCallbackValue
 ): [number, number, number, number] {
   if (typeof value === 'string') {
     return parseHexColorToRgba255(value);
@@ -130,21 +140,48 @@ export function normalizeColorFrameValue(
     );
   }
 
-  throw new Error('Invalid color frame value');
+  throw new Error('Invalid colorMap callback value');
 }
 
 /**
- * Build one animation frame iterating over the values array.
+ * Build a 256-entry RGBA colorMap LUT suitable for `HealpixCellsLayer.colorMap`.
+ *
+ * The callback is invoked for each of the 256 slots with the normalized
+ * position `t = i / 255` in `[0, 1]` and the raw byte index `i` in
+ * `[0, 255]`. Return one of:
+ *   - a CSS hex string (`#RGB`, `#RGBA`, `#RRGGBB`, `#RRGGBBAA`)
+ *   - a 3- or 4-tuple of bytes in `0`–`255`
+ *   - `{ normalized: true, rgba: [r, g, b] | [r, g, b, a] }` with channels in `0`–`1`
+ *
+ * Alpha defaults to `255` when a 3-channel form is used. The resulting
+ * buffer is exactly `256 × 4 = 1024` bytes long.
+ *
+ * @example
+ * ```ts
+ * // Red → blue gradient
+ * const map = makeColorMap((t) => ({
+ *   normalized: true,
+ *   rgba: [1 - t, 0, t]
+ * }));
+ *
+ * // Three-stop hex ramp
+ * const steps = makeColorMap((_, i) => (i < 85 ? '#f00' : i < 170 ? '#0f0' : '#00f'));
+ * ```
  */
-export function makeColorFrameFromValues<T>(
-  values: T[],
-  getColor: (value: T, index: number, all: T[]) => ColorFrameCallbackValue
+export function makeColorMap(
+  getColor: (t: number, index: number) => ColorMapCallbackValue
 ): Uint8Array {
-  const cellCount = values.length;
-  const out = new Uint8Array(cellCount * 4);
-  for (let i = 0; i < cellCount; i++) {
-    const color = normalizeColorFrameValue(getColor(values[i], i, values));
+  const out = new Uint8Array(256 * 4);
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    const color = normalizeCallbackValue(getColor(t, i));
     out.set(color, i * 4);
   }
   return out;
 }
+
+/**
+ * Default colorMap: linear black (0,0,0,255) → white (255,255,255,255) gradient.
+ * 256 entries × 4 bytes (RGBA) = 1024 bytes.
+ */
+export const DEFAULT_COLORMAP: Uint8Array = makeColorMap((_, i) => [i, i, i]);
