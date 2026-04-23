@@ -75,6 +75,7 @@ HealpixCellsLayer (CompositeLayer)
 | `package.json` | Take main's |
 | `src/index.ts` → `packages/.../src/index.ts` | Take main's path/content; add `splitCellIds` export |
 | `src/layers/healpix-cells-layer.ts` | Discard both sides; write combined version |
+| `src/utils/color-frame.ts` (delete/modify conflict) | Accept deletion — superseded by `color-map.ts` |
 | `eslint.config.mjs` | Take main's |
 | `tsconfig.json` / `tsconfig.jest.json` | Take main's |
 | `rollup.config.mjs` | Take main's |
@@ -101,6 +102,7 @@ HealpixCellsLayer (CompositeLayer)
 type HealpixCellsLayerState = {
   cellIdLo: Uint32Array;
   cellIdHi: Uint32Array;
+  cellIndex: Float32Array;          // [0, 1, …, N-1] for HealpixColorExtension
   valuesTexture: Texture | null;
   colorMapTexture: Texture | null;
   prevResolved: ResolvedFrame | null;
@@ -109,7 +111,7 @@ type HealpixCellsLayerState = {
 
 ### `updateState` logic
 
-- `cellIds` changed → re-run `splitCellIds`, regenerate `healpixCellIndex`
+- `cellIds` changed → re-run `splitCellIds`, rebuild `cellIndex` (`Float32Array.from({length:N}, (_,i)=>i)`) — both stored in state, not regenerated per-render
 - `frames`/`values`/`colorMap`/`min`/`max`/`dimensions` changed → re-resolve frame via `resolveFrame`, rebuild textures via `packValuesData` / `makeColorMap`
 
 ### `renderLayers()`
@@ -123,9 +125,9 @@ new HealpixCellsPrimitiveLayer(
     data: {
       length: count,
       attributes: {
-        cellIdLo:         { value: cellIdLo,                          size: 1 },
-        cellIdHi:         { value: cellIdHi,                          size: 1 },
-        healpixCellIndex: { value: Float32Array.from({length:count}, (_,i)=>i), size: 1 }
+        cellIdLo:         { value: cellIdLo,   size: 1 },
+        cellIdHi:         { value: cellIdHi,   size: 1 },
+        healpixCellIndex: { value: cellIndex,  size: 1 }  // from state, built in updateState
       }
     },
     valuesTexture, colorMapTexture,
