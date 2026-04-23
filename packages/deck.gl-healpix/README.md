@@ -1,10 +1,10 @@
-![HEALPix Banner](./docs/healpix-banner.png)
+![HEALPix Banner](../../docs/healpix-banner.png)
 
 <p align='center'>
   <a href='https://github.com/developmentseed/healpix-ts'>HEALPix Typescript</a> | <a href='https://github.com/developmentseed/deck.gl-healpix'>HEALPix Deck.gl Layer</a> 
 </p>
 
-# HEALPix Deck.gl 
+# deck.gl-healpix
 
 A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.sourceforge.io/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.  
 It is especially suited for animating a large number of cells: per-cell values are uploaded once to the GPU and a small colorMap lookup is applied every frame on the vertex shader.
