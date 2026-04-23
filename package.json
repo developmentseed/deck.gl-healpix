@@ -1,7 +1,8 @@
 {
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/*"
   ],
   "description": "Monorepo for HEALPix deck.gl layers and related packages",
   "scripts": {

@@ -13,9 +13,15 @@ Thumbs.db
 *.swp
 *.swo
 
-# Environment
-.env
-.env.local
+
+################################################
+# Environment files
+#
+# Common files used to store environment
+################################################
+
+.env*
+!.env.example
 
 # Test coverage
 coverage/
