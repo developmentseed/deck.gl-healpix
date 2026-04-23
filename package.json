@@ -1,5 +1,4 @@
 {
-  "name": "deck.gl-healpix-monorepo",
   "private": true,
   "workspaces": [
     "packages/*"

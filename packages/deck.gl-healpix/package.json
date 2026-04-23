@@ -1,5 +1,5 @@
 {
-  "name": "deck.gl-healpix",
+  "name": "@developmentseed/deck.gl-healpix",
   "version": "0.1.0",
   "description": "HEALPix (Hierarchical Equal Area isoLatitude Pixelization) implementation in Deck.gl",
   "main": "dist/index.js",
