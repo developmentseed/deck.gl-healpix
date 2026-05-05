@@ -1,9 +1,11 @@
 import type {
+  HealpixColorMode,
   HealpixCellsLayerProps,
   HealpixFrameObject
 } from '../types/layer-props';
 import type { CellIdArray } from '../types/cell-ids';
 import { DEFAULT_COLORMAP, validateColorMap } from './color-map';
+import { HEALPIX_COLOR_MODE_SCALAR as DEFAULT_COLOR_MODE } from '../types/layer-props';
 
 /** The fully resolved, validated frame ready for GPU upload. */
 export type ResolvedFrame = {
@@ -13,7 +15,12 @@ export type ResolvedFrame = {
   values: ArrayLike<number>;
   min: number;
   max: number;
-  dimensions: 1 | 2 | 3 | 4;
+  colorMode: HealpixColorMode;
+  filterMin: number;
+  filterMax: number;
+  rescaleMin: number;
+  rescaleMax: number;
+  dimensions: number;
   colorMap: Uint8Array;
 };
 
@@ -65,9 +72,12 @@ export function resolveFrame(props: HealpixCellsLayerProps): ResolvedFrame {
   const colorMap = frame.colorMap ?? props.colorMap ?? DEFAULT_COLORMAP;
   validateColorMap(colorMap); // throws if wrong length
 
-  const dimensions = (frame.dimensions ??
-    props.dimensions ??
-    1) as ResolvedFrame['dimensions'];
+  const dimensions = frame.dimensions ?? props.dimensions ?? 1;
+  if (!Number.isInteger(dimensions) || dimensions < 1) {
+    throw new Error(
+      `HealpixCellsLayer: dimensions (${dimensions}) must be a positive integer`
+    );
+  }
 
   // values length check
   const expectedLen = cellIds.length * dimensions;
@@ -84,6 +94,13 @@ export function resolveFrame(props: HealpixCellsLayerProps): ResolvedFrame {
     values,
     min: frame.min ?? props.min ?? 0,
     max: frame.max ?? props.max ?? 1,
+    colorMode: frame.colorMode ?? props.colorMode ?? DEFAULT_COLOR_MODE,
+    filterMin: frame.filterMin ?? props.filterMin ?? -Infinity,
+    filterMax: frame.filterMax ?? props.filterMax ?? Infinity,
+    rescaleMin:
+      frame.rescaleMin ?? props.rescaleMin ?? frame.min ?? props.min ?? 0,
+    rescaleMax:
+      frame.rescaleMax ?? props.rescaleMax ?? frame.max ?? props.max ?? 1,
     dimensions,
     colorMap
   };
