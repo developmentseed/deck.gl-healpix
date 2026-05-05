@@ -6,8 +6,9 @@
 
 # deck.gl-healpix
 
-A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.sourceforge.io/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.  
-It is especially suited for animating a large number of cells: per-cell values are uploaded once to the GPU and a small colorMap lookup is applied every frame on the vertex shader.
+A [deck.gl](https://deck.gl/) layer for rendering [HEALPix](https://healpix.sourceforge.io/) (Hierarchical Equal Area isoLatitude Pixelization) cells on a map.
+
+It is suited for animating a large number of cells: per-cell values are uploaded once to the GPU and a configurable color pipeline (filter → rescale → color) runs every frame in the fragment shader. The pipeline is composed of luma.gl shader modules and exposes hook points so you can inject custom GLSL (band math, gamma rescale, classification, etc.) without forking the layer.
 
 https://github.com/user-attachments/assets/4166d5d5-65e3-4309-a63a-0a2d0cdf275d
 
@@ -27,7 +28,7 @@ npm install @deck.gl/core @deck.gl/layers @luma.gl/core @luma.gl/engine
 
 ### Single frame
 
-Pass per-cell numeric `values` plus a `[min, max]` range. The layer normalizes each value and maps it through a 256-entry `colorMap` LUT on the GPU. If `colorMap` is omitted a linear black-to-white ramp is used.
+Pass per-cell numeric `values` plus a `[rescaleMin, rescaleMax]` range. The layer normalizes each value and maps it through a 256-entry `colorMap` LUT on the GPU. If `colorMap` is omitted a linear black-to-white ramp is used.
 
 ```ts
 import { HealpixCellsLayer } from '@developmentseed/deck.gl-healpix';
@@ -40,10 +41,12 @@ const layer = new HealpixCellsLayer({
   nside: 64,
   cellIds,
   values,
-  min: 0,
-  max: 1
+  rescaleMin: 0,
+  rescaleMax: 1
 });
 ```
+
+`min` and `max` are still accepted as backwards-compatible aliases for `rescaleMin` / `rescaleMax`.
 
 ### Multi-frame animation
 
@@ -58,8 +61,8 @@ const layer = new HealpixCellsLayer({
   id: 'healpix',
   nside: 64,
   cellIds,
-  min: 0,
-  max: 1,
+  rescaleMin: 0,
+  rescaleMax: 1,
   frames: [
     { values: new Float32Array([0.0, 0.25, 0.5, 0.75]) },
     { values: new Float32Array([1.0, 0.75, 0.5, 0.25]) }
@@ -68,26 +71,53 @@ const layer = new HealpixCellsLayer({
 });
 ```
 
-Each frame may override any root-level field (`nside`, `scheme`, `cellIds`, `values`, `min`, `max`, `dimensions`, `colorMap`). Fields omitted on a frame fall back to the root value.
+Each frame may override any root-level field (`nside`, `scheme`, `cellIds`, `values`, `dimensions`, `colorMode`, `filterMin`, `filterMax`, `rescaleMin`, `rescaleMax`, `colorMap`, plus the legacy `min` / `max`). Fields omitted on a frame fall back to the root value. `shaderModules` is the only render-pipeline prop that is root-only.
+
+### Filter and rescale
+
+In scalar modes the layer runs a two-stage pipeline before the colorMap lookup:
+
+- **Filter** — cells whose first value is outside `[filterMin, filterMax]` are discarded entirely (they do not contribute to picking either). Default: unbounded.
+- **Rescale** — surviving values are linearly normalized through `[rescaleMin, rescaleMax]` and clamped to `[0, 1]` before the LUT lookup.
+
+```ts
+new HealpixCellsLayer({
+  id: 'ndvi',
+  nside,
+  cellIds,
+  values,
+  filterMin: 0.2,    // hide bare soil / water
+  rescaleMin: -0.1,
+  rescaleMax: 0.8
+});
+```
 
 ### Direct RGB / RGBA values
 
-Skip the colorMap and push color directly to the GPU by setting `dimensions` to `3` or `4`. Values are interpreted as normalized channels (`0.0`–`1.0`) interleaved per cell.
+Set `dimensions` to the number of source channels and pick a non-scalar `colorMode` to push color directly to the GPU, bypassing the colorMap. Values are interpreted as normalized channels (`0.0`–`1.0`) interleaved per cell.
 
 ```ts
-const layer = new HealpixCellsLayer({
+import {
+  HealpixCellsLayer,
+  HEALPIX_COLOR_MODE_RGB
+} from '@developmentseed/deck.gl-healpix';
+
+new HealpixCellsLayer({
   id: 'healpix',
   nside: 64,
   cellIds: new Uint32Array([0, 1]),
   dimensions: 3,
+  colorMode: HEALPIX_COLOR_MODE_RGB,
   // cell 0 → red, cell 1 → green
   values: new Float32Array([1, 0, 0, 0, 1, 0])
 });
 ```
 
+`dimensions` and `colorMode` are independent: `dimensions` controls how many source values are stored per cell (it can exceed `4`); `colorMode` controls how the selected `vec4` is interpreted for rendering.
+
 ### Custom colorMap
 
-A `colorMap` is a `Uint8Array` of exactly **256 × 4 = 1024 bytes** in RGBA order. Index `0` maps to `min`, index `255` to `max`.
+A `colorMap` is a `Uint8Array` of exactly **256 × 4 = 1024 bytes** in RGBA order. Index `0` maps to `rescaleMin`, index `255` to `rescaleMax`.
 
 The `makeColorMap` helper builds one from a callback that is invoked 256 times with the normalized position `t = i / 255` and the raw byte index `i`. Return a hex string, a `[r, g, b]`/`[r, g, b, a]` tuple in `0`–`255`, or `{ normalized: true, rgba: [...] }` in `0`–`1`.
 
@@ -116,33 +146,111 @@ You can also build the buffer yourself — the layer will accept any `Uint8Array
 
 A `CompositeLayer` that renders HEALPix cells as filled polygons whose colors are computed on the GPU from per-cell float `values`.
 
-| Prop           | Type                    | Default       | Description                                                                                        |
-| -------------- | ----------------------- | ------------- | -------------------------------------------------------------------------------------------------- |
-| `nside`        | `number`                | `0`           | HEALPix resolution parameter (power of 2). Required on the layer or on every frame.  |
-| `cellIds`      | `CellIdArray`           | `Uint32Array(0)` | HEALPix cell indices to render. Required on the layer or on every frame.                        |
-| `scheme`       | `'nest' \| 'ring'`      | `'nest'`      | Pixel numbering scheme.                                                                            |
-| `values`       | `ArrayLike<number>`     | —             | Interleaved per-cell float values. Length = `cellIds.length × dimensions`. Required when `frames` is absent. |
-| `min`          | `number`                | `0`           | Value mapped to colorMap index 0.                                                                  |
-| `max`          | `number`                | `1`           | Value mapped to colorMap index 255.                                                                |
-| `dimensions`   | `1 \| 2 \| 3 \| 4`      | `1`           | Number of values per cell. See table below.                                                        |
-| `colorMap`     | `Uint8Array` (1024 B)   | black → white | 256-entry RGBA LUT used when `dimensions` is `1` or `2`.                                           |
-| `frames`       | `HealpixFrameObject[]`  | —             | Optional animation frames; each may override any root field.                                       |
-| `currentFrame` | `number`                | `0`           | Active index into `frames`. Clamped to `[0, frames.length - 1]`.                                   |
+| Prop            | Type                              | Default                         | Description                                                                                                  |
+| --------------- | --------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `nside`         | `number`                          | —                               | HEALPix resolution parameter (power of 2). Required on the layer or on every frame.                          |
+| `cellIds`       | `CellIdArray`                     | —                               | HEALPix cell indices to render. Required on the layer or on every frame.                                     |
+| `scheme`        | `'nest' \| 'ring'`                | `'nest'`                        | Pixel numbering scheme.                                                                                      |
+| `values`        | `ArrayLike<number>`               | —                               | Interleaved per-cell float values. Length = `cellIds.length × dimensions`. Required when `frames` is absent. |
+| `dimensions`    | `number`                          | `1`                             | Source values stored per cell (any positive integer; values >`4` are packed across multiple texels).         |
+| `colorMode`     | `HealpixColorMode`                | `HEALPIX_COLOR_MODE_SCALAR`     | How selected values are interpreted. See table below.                                                        |
+| `filterMin`     | `number`                          | `-Infinity`                     | Inclusive lower bound. Cells with `valueAt(0) < filterMin` are discarded (scalar modes only).                |
+| `filterMax`     | `number`                          | `Infinity`                      | Inclusive upper bound. Cells with `valueAt(0) > filterMax` are discarded (scalar modes only).                |
+| `rescaleMin`    | `number`                          | `0`                             | Value mapped to colorMap index 0 (scalar modes only).                                                        |
+| `rescaleMax`    | `number`                          | `1`                             | Value mapped to colorMap index 255 (scalar modes only).                                                      |
+| `colorMap`      | `Uint8Array` (1024 B)             | black → white                   | 256-entry RGBA LUT used in scalar modes.                                                                     |
+| `frames`        | `HealpixFrameObject[]`            | —                               | Optional animation frames; each may override any root field.                                                 |
+| `currentFrame`  | `number`                          | `0`                             | Active index into `frames`. Clamped to `[0, frames.length - 1]`.                                             |
+| `shaderModules` | `ShaderModule[]`                  | `[]`                            | Custom luma.gl shader modules appended after the built-in pipeline. Root-only (cannot be set per frame).     |
 
-### `dimensions` modes
+### `colorMode` modes
 
-| `dimensions` | Interpretation                                                                 |
-| ------------ | ------------------------------------------------------------------------------ |
-| `1`          | Scalar → normalized through `[min, max]` → colorMap LUT → RGBA                 |
-| `2`          | Scalar (→ colorMap) + opacity multiplier (`0`–`1`) in the second value         |
-| `3`          | Direct RGB in `0`–`1`; `colorMap` / `min` / `max` ignored; alpha = `1`         |
-| `4`          | Direct RGBA in `0`–`1`; `colorMap` / `min` / `max` ignored                     |
+| Constant                          | Interpretation                                                                                |
+| --------------------------------- | --------------------------------------------------------------------------------------------- |
+| `HEALPIX_COLOR_MODE_SCALAR`       | `valueAt(0)` → filter → rescale → colorMap LUT → RGBA. Alpha = `1`.                           |
+| `HEALPIX_COLOR_MODE_SCALAR_ALPHA` | `valueAt(0)` → filter → rescale → colorMap LUT, then multiplied by `valueAt(1)` as alpha.     |
+| `HEALPIX_COLOR_MODE_RGB`          | Direct `vec4(valueAt(0), valueAt(1), valueAt(2), 1)`. Filter / rescale / colorMap ignored.    |
+| `HEALPIX_COLOR_MODE_RGBA`         | Direct `vec4(valueAt(0..3))`. Filter / rescale / colorMap ignored.                            |
 
 `values` is always an interleaved flat array: cell `i` occupies indices `i * dimensions` through `i * dimensions + dimensions - 1`.
 
+`dimensions` controls texture packing only — it is decoupled from `colorMode`. You can store ten bands per cell (`dimensions: 10`) and still pick which channels the renderer consumes via a custom `HEALPIX_SELECT_VALUES` injection (see below).
+
+### Custom shader modules
+
+The primitive layer registers two custom fragment-shader hooks:
+
+- `fs:HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)` — runs after the default selection (`channels 0..3`), before filter/rescale. Use it to compute derived values (NDVI, classification, etc.) and write into `healpixSelectedValues`. Calling `discard;` here drops the cell entirely (including from picking).
+- `fs:HEALPIX_RESCALE_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)` — runs after the built-in rescale, before the colorMap lookup. Use it to apply gamma, sigmoid, or any final scalar transform.
+
+Inside the hooks the values module exposes:
+
+```glsl
+int   healpixCell;            // current cell index
+int   healpixDimensions;      // source channel count
+int   healpixColorMode;       // active HEALPIX_COLOR_MODE_*
+vec4  healpixSelectedValues;  // working selection (mutable)
+float healpixValueAt(int channel); // any channel in [0, healpixDimensions)
+```
+
+Pass custom modules via the root-level `shaderModules` prop:
+
+```ts
+import {
+  HealpixCellsLayer,
+  HEALPIX_COLOR_MODE_SCALAR
+} from '@developmentseed/deck.gl-healpix';
+
+const ndviSelector = {
+  name: 'ndviSelector',
+  inject: {
+    'fs:HEALPIX_SELECT_VALUES': `\
+float nir = healpixValueAt(7);
+float red = healpixValueAt(3);
+float ndvi = (nir - red) / max(nir + red, 1e-6);
+healpixSelectedValues = vec4(ndvi, 0.0, 0.0, 0.0);
+`
+  }
+};
+
+const gammaRescale = {
+  name: 'gammaRescale',
+  inject: {
+    'fs:HEALPIX_RESCALE_VALUES': `\
+healpixSelectedValues.x = pow(clamp(healpixSelectedValues.x, 0.0, 1.0), 0.5);
+`
+  }
+};
+
+new HealpixCellsLayer({
+  id: 'ndvi',
+  nside,
+  cellIds,
+  values,                // 10 bands per cell
+  dimensions: 10,
+  colorMode: HEALPIX_COLOR_MODE_SCALAR,
+  rescaleMin: -1,
+  rescaleMax: 1,
+  colorMap,
+  shaderModules: [ndviSelector, gammaRescale]
+});
+```
+
+The fragment pipeline is:
+
+```
+healpixValues  → default select (channels 0..3)
+               → fs:HEALPIX_SELECT_VALUES   (user, optional)
+               → healpixFilter              (scalar modes)
+               → healpixRescale             (scalar modes)
+               → fs:HEALPIX_RESCALE_VALUES  (user, optional)
+               → healpixColor               (colorMap or direct RGB/RGBA)
+               → fragColor
+```
+
 ### `HealpixFrameObject`
 
-Every field is optional and falls back to the matching root-level prop. `values` is the only field that must be set somewhere (root or frame).
+Every field is optional and falls back to the matching root-level prop. `values` is the only field that must be set somewhere (root or frame). `shaderModules` is root-only.
 
 ```ts
 type HealpixFrameObject = {
@@ -150,25 +258,14 @@ type HealpixFrameObject = {
   scheme?: 'nest' | 'ring';
   cellIds?: CellIdArray;
   values?: ArrayLike<number>;
-  min?: number;
-  max?: number;
-  dimensions?: 1 | 2 | 3 | 4;
+  dimensions?: number;
+  colorMode?: HealpixColorMode;
+  filterMin?: number;
+  filterMax?: number;
+  rescaleMin?: number;
+  rescaleMax?: number;
   colorMap?: Uint8Array;
 };
-```
-
-### Geometry worker
-
-Cell polygon geometry is computed on the CPU in a Web Worker pool. If the default worker loader does not work for your bundler you can supply a custom factory:
-
-```ts
-import { setWorkerFactory, setWorkerUrl } from '@developmentseed/deck.gl-healpix';
-
-// Provide an explicit worker URL …
-setWorkerUrl(new URL('@developmentseed/deck.gl-healpix/worker', import.meta.url));
-
-// … or supply a custom factory that returns a ready-to-use Worker instance.
-setWorkerFactory(() => new Worker(/* ... */));
 ```
 
 ### `makeColorMap(getColor)`
@@ -192,13 +289,21 @@ The callback receives `(t: number, index: number)` where `t = index / 255` in `[
 
 Values outside their valid range are clamped.
 
-### Types
+### Types and constants
 
 ```ts
+import {
+  HEALPIX_COLOR_MODE_SCALAR,
+  HEALPIX_COLOR_MODE_SCALAR_ALPHA,
+  HEALPIX_COLOR_MODE_RGB,
+  HEALPIX_COLOR_MODE_RGBA
+} from '@developmentseed/deck.gl-healpix';
+
 import type {
   HealpixCellsLayerProps,
   HealpixFrameObject,
   HealpixScheme,
+  HealpixColorMode,
   CellIdArray,
   ColorMapCallbackValue
 } from '@developmentseed/deck.gl-healpix';
@@ -206,6 +311,7 @@ import type {
 
 - **`HealpixScheme`** — `'nest' | 'ring'`
 - **`CellIdArray`** — `Int32Array | Uint32Array | Float32Array | Float64Array`
+- **`HealpixColorMode`** — Union of the four `HEALPIX_COLOR_MODE_*` integer constants.
 - **`HealpixCellsLayerProps`** — Full prop type for the layer.
 - **`HealpixFrameObject`** — One animation frame; see above.
 - **`ColorMapCallbackValue`** — Return type accepted by the `makeColorMap` callback.

@@ -3,6 +3,8 @@ import Map from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Box, Field, Flex, NativeSelect, Slider, Text } from '@chakra-ui/react';
 import {
+  HEALPIX_COLOR_MODE_RGB,
+  HEALPIX_COLOR_MODE_SCALAR,
   HealpixCellsLayer,
   makeColorMap
 } from '@developmentseed/deck.gl-healpix';
@@ -76,8 +78,10 @@ export default function PageColor() {
 
   const [visualization, setVisualization] =
     useState<BandVisualizationMode>('true_color');
-  const [indexMin, setIndexMin] = useState(0);
-  const [indexMax, setIndexMax] = useState(1);
+  const [rescaleMin, setRescaleMin] = useState(0);
+  const [rescaleMax, setRescaleMax] = useState(1);
+  const [filterMin, setFilterMin] = useState(-Infinity);
+  const [filterMax, setFilterMax] = useState(Infinity);
   const [colorScheme, setColorScheme] =
     useState<ColorSchemeName>('interpolateViridis');
 
@@ -107,8 +111,10 @@ export default function PageColor() {
 
   useEffect(() => {
     const [lo, hi] = defaultDisplayRange(visualization);
-    setIndexMin(lo);
-    setIndexMax(hi);
+    setRescaleMin(lo);
+    setRescaleMax(hi);
+    setFilterMin(-Infinity);
+    setFilterMax(Infinity);
   }, [visualization]);
 
   const ndvi = isNdviMode(visualization);
@@ -117,6 +123,12 @@ export default function PageColor() {
 
   const displayRangeMin = ndvi ? -1 : 0;
   const displayRangeMax = 1;
+  const filterSliderMin = Number.isFinite(filterMin)
+    ? filterMin
+    : displayRangeMin;
+  const filterSliderMax = Number.isFinite(filterMax)
+    ? filterMax
+    : displayRangeMax;
 
   const colorMap = useMemo(
     () =>
@@ -140,8 +152,11 @@ export default function PageColor() {
           cellIds,
           values,
           dimensions: 1,
-          min: indexMin,
-          max: indexMax,
+          colorMode: HEALPIX_COLOR_MODE_SCALAR,
+          rescaleMin,
+          rescaleMax,
+          filterMin,
+          filterMax,
           colorMap
         })
       ];
@@ -157,8 +172,11 @@ export default function PageColor() {
           cellIds,
           values,
           dimensions: 1,
-          min: indexMin,
-          max: indexMax,
+          colorMode: HEALPIX_COLOR_MODE_SCALAR,
+          rescaleMin,
+          rescaleMax,
+          filterMin,
+          filterMax,
           colorMap
         })
       ];
@@ -175,12 +193,21 @@ export default function PageColor() {
         cellIds,
         values,
         dimensions: 3,
+        colorMode: HEALPIX_COLOR_MODE_RGB,
         min: 0,
         max: 1,
         colorMap
       })
     ];
-  }, [zarrData, visualization, colorMap, indexMin, indexMax]);
+  }, [
+    zarrData,
+    visualization,
+    colorMap,
+    rescaleMin,
+    rescaleMax,
+    filterMin,
+    filterMax
+  ]);
 
   return (
     <Flex w='100%' h='100%' flexFlow='column' position='relative'>
@@ -204,10 +231,10 @@ export default function PageColor() {
           Sentinel 2 scene with 10 bands in healpix
           <br />
           <Text as='span' fontSize='sm'>
-            Cell coloring is computed on the GPU according the the values and
-            number of bands. Visualizations with 3 bands are rendered directly
-            as RGB. Visualizations with 1 band are mapped to a color scheme and
-            possibly rescaled.
+            Cell coloring is computed on the GPU from the selected source
+            values and color mode. RGB visualizations render selected values
+            directly, while scalar visualizations map through a color scheme
+            after optional filtering and rescaling.
           </Text>
         </Text>
 
@@ -262,23 +289,18 @@ export default function PageColor() {
             <Field.Label fontSize='sm' fontWeight='semibold' mb={1}>
               {ndvi ? 'NDVI rescale' : 'Rescale'}
             </Field.Label>
-            <Text fontSize='xs' color='fg.muted' mb={2}>
-              {ndvi
-                ? 'Typical index roughly −1 … 1. Min/max set the display stretch.'
-                : 'Adjust min/max for single-band display stretch (0…1).'}
-            </Text>
             <Slider.Root
               width='100%'
               min={displayRangeMin}
               max={displayRangeMax}
               step={0.002}
-              value={[indexMin, indexMax]}
+              value={[rescaleMin, rescaleMax]}
               onValueChange={({ value }) => {
                 const [a, b] = value;
                 const lo = Math.min(a, b);
                 const hi = Math.max(a, b);
-                setIndexMin(lo);
-                setIndexMax(hi);
+                setRescaleMin(lo);
+                setRescaleMax(hi);
               }}
             >
               <Slider.Control>
@@ -289,8 +311,47 @@ export default function PageColor() {
               </Slider.Control>
             </Slider.Root>
             <Flex justify='space-between' mt={1} fontSize='sm' gap={4}>
-              <Text>Min: {indexMin.toFixed(3)}</Text>
-              <Text>Max: {indexMax.toFixed(3)}</Text>
+              <Text>Min: {rescaleMin.toFixed(3)}</Text>
+              <Text>Max: {rescaleMax.toFixed(3)}</Text>
+            </Flex>
+          </Field.Root>
+        )}
+
+        {showScalarControls && (
+          <Field.Root>
+            <Field.Label fontSize='sm' fontWeight='semibold' mb={1}>
+              Visibility filter
+            </Field.Label>
+            <Slider.Root
+              width='100%'
+              min={displayRangeMin}
+              max={displayRangeMax}
+              step={0.002}
+              value={[filterSliderMin, filterSliderMax]}
+              onValueChange={({ value }) => {
+                const [a, b] = value;
+                const lo = Math.min(a, b);
+                const hi = Math.max(a, b);
+                setFilterMin(lo);
+                setFilterMax(hi);
+              }}
+            >
+              <Slider.Control>
+                <Slider.Track>
+                  <Slider.Range />
+                </Slider.Track>
+                <Slider.Thumbs />
+              </Slider.Control>
+            </Slider.Root>
+            <Flex justify='space-between' mt={1} fontSize='sm' gap={4}>
+              <Text>
+                Min:{' '}
+                {Number.isFinite(filterMin) ? filterMin.toFixed(3) : 'none'}
+              </Text>
+              <Text>
+                Max:{' '}
+                {Number.isFinite(filterMax) ? filterMax.toFixed(3) : 'none'}
+              </Text>
             </Flex>
           </Field.Root>
         )}
