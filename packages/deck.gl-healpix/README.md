@@ -178,18 +178,19 @@ A `CompositeLayer` that renders HEALPix cells as filled polygons whose colors ar
 
 ### Custom shader modules
 
-The primitive layer registers two custom fragment-shader hooks:
+The primitive layer registers two custom fragment-shader hooks (deck.gl-style `inout` signatures):
 
-- `fs:HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)` — runs after the default selection (`channels 0..3`), before filter/rescale. Use it to compute derived values (NDVI, classification, etc.) and write into `healpixSelectedValues`. Calling `discard;` here drops the cell entirely (including from picking).
+- `fs:HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)` — runs after the default selection (`channels 0..3`), before filter/rescale. Use it to compute derived values (NDVI, classification, etc.). Calling `discard;` here drops the cell entirely (including from picking).
 - `fs:HEALPIX_RESCALE_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)` — runs after the built-in rescale, before the colorMap lookup. Use it to apply gamma, sigmoid, or any final scalar transform.
 
-Inside the hooks the values module exposes:
+> **Important — write to `selectedValues`.** GLSL `inout` is copy-in / copy-out. The hook body receives a local copy of the global as `selectedValues`; on return, that local is written back over the global. Writing directly to `healpixSelectedValues` from inside a hook body is silently overwritten by the unchanged parameter on function return.
+
+Inside the hooks the values module exposes (in addition to the `selectedValues` parameter):
 
 ```glsl
 int   healpixCell;            // current cell index
 int   healpixDimensions;      // source channel count
 int   healpixColorMode;       // active HEALPIX_COLOR_MODE_*
-vec4  healpixSelectedValues;  // working selection (mutable)
 float healpixValueAt(int channel); // any channel in [0, healpixDimensions)
 ```
 
@@ -208,7 +209,7 @@ const ndviSelector = {
 float nir = healpixValueAt(7);
 float red = healpixValueAt(3);
 float ndvi = (nir - red) / max(nir + red, 1e-6);
-healpixSelectedValues = vec4(ndvi, 0.0, 0.0, 0.0);
+selectedValues = vec4(ndvi, 0.0, 0.0, 0.0);
 `
   }
 };
@@ -217,7 +218,7 @@ const gammaRescale = {
   name: 'gammaRescale',
   inject: {
     'fs:HEALPIX_RESCALE_VALUES': `\
-healpixSelectedValues.x = pow(clamp(healpixSelectedValues.x, 0.0, 1.0), 0.5);
+selectedValues.x = pow(clamp(selectedValues.x, 0.0, 1.0), 0.5);
 `
   }
 };

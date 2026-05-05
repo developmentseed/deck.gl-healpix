@@ -36,6 +36,10 @@ vec4 healpixSelectedValues;
 // the no-op bodies (and any user injections) after the deck.gl hook bodies,
 // but our injections call them from inside DECKGL_FILTER_COLOR. GLSL requires
 // a declaration before the call site, so declare them here.
+//
+// The hooks follow the deck.gl DECKGL_FILTER_COLOR pattern: inout vec4 is
+// the working selection. Hook bodies must mutate the parameter
+// (selectedValues).
 void HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry);
 void HEALPIX_RESCALE_VALUES(inout vec4 selectedValues, FragmentGeometry geometry);
 
