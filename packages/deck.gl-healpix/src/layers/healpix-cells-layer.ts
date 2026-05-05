@@ -6,9 +6,9 @@ import {
   UpdateParameters
 } from '@deck.gl/core';
 import type { Texture } from '@luma.gl/core';
+import type { ShaderModule } from '@luma.gl/shadertools';
 import { splitCellIds } from '../utils/split-cell-ids';
 import { HealpixCellsPrimitiveLayer } from './healpix-cells-primitive-layer';
-import { HEALPIX_COLOR_EXTENSION } from '../extensions/healpix-color-extension';
 import { resolveFrame, type ResolvedFrame } from '../utils/resolve-frame';
 import { packValuesData } from '../utils/values-texture';
 import type { CellIdArray } from '../types/cell-ids';
@@ -24,10 +24,16 @@ type _HealpixCellsLayerProps = {
   values: ArrayLike<number> | null;
   min: number;
   max: number;
-  dimensions: 1 | 2 | 3 | 4;
+  colorMode?: number;
+  filterMin?: number;
+  filterMax?: number;
+  rescaleMin?: number;
+  rescaleMax?: number;
+  dimensions: number;
   colorMap: Uint8Array | null;
   frames: HealpixFrameObject[] | null;
   currentFrame: number;
+  shaderModules?: ShaderModule[];
 };
 
 type HealpixCellsLayerState = {
@@ -37,6 +43,7 @@ type HealpixCellsLayerState = {
   valuesTexture: Texture | null;
   colorMapTexture: Texture | null;
   valuesTextureWidth: number;
+  valuesTexelsPerCell: number;
   prevResolved: ResolvedFrame | null;
 };
 
@@ -68,6 +75,7 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
       valuesTexture: null,
       colorMapTexture: null,
       valuesTextureWidth: 1,
+      valuesTexelsPerCell: 1,
       prevResolved: null
     });
     this._rebuildAll();
@@ -122,12 +130,23 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
       valuesTexture,
       colorMapTexture,
       valuesTextureWidth,
+      valuesTexelsPerCell,
       prevResolved
     } = this.state;
 
     if (!valuesTexture || !colorMapTexture || !prevResolved) return [];
 
-    const { cellIds, nside, scheme, min, max, dimensions } = prevResolved;
+    const {
+      cellIds,
+      nside,
+      scheme,
+      filterMin,
+      filterMax,
+      rescaleMin,
+      rescaleMax,
+      colorMode,
+      dimensions
+    } = prevResolved;
     const count = cellIds.length;
     if (count === 0) return [];
 
@@ -148,14 +167,16 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
           },
           valuesTexture,
           colorMapTexture,
-          uMin: min,
-          uMax: max,
+          uFilterMin: filterMin,
+          uFilterMax: filterMax,
+          uRescaleMin: rescaleMin,
+          uRescaleMax: rescaleMax,
           uDimensions: dimensions,
+          uColorMode: colorMode,
           uValuesWidth: valuesTextureWidth,
-          extensions: [
-            ...((this.props.extensions as LayerExtension[]) || []),
-            HEALPIX_COLOR_EXTENSION
-          ]
+          uTexelsPerCell: valuesTexelsPerCell,
+          shaderModules: this.props.shaderModules ?? [],
+          extensions: (this.props.extensions as LayerExtension[]) || []
         })
       )
     ];
@@ -200,7 +221,7 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
 
     const { maxTextureDimension2D: maxTextureSize } =
       this.context.device.limits;
-    const { data, width, height } = packValuesData(
+    const { data, width, height, texelsPerCell } = packValuesData(
       values,
       dimensions,
       cellCount,
@@ -233,7 +254,11 @@ export class HealpixCellsLayer extends CompositeLayer<HealpixCellsLayerProps> {
     });
     texture.copyImageData({ data });
 
-    this.setState({ valuesTexture: texture, valuesTextureWidth: width });
+    this.setState({
+      valuesTexture: texture,
+      valuesTextureWidth: width,
+      valuesTexelsPerCell: texelsPerCell
+    });
     oldTexture?.destroy();
   }
 
