@@ -1,4 +1,14 @@
-import { Button, ChakraProvider, Heading, Image, Flex } from '@chakra-ui/react';
+import {
+  Button,
+  ChakraProvider,
+  Heading,
+  Image,
+  Flex,
+  Separator,
+  Link,
+  IconButton
+} from '@chakra-ui/react';
+import { CollecticonBrandGithub } from '@devseed-ui/collecticons-chakra';
 import { BrowserRouter, NavLink, NavLinkProps } from 'react-router';
 import system from '../styles/theme';
 
@@ -43,7 +53,15 @@ export function PageLayout(props: {
               <Image src='/logo.svg' alt='Logo' boxSize='32px' />
               {title}
             </Heading>
-            {navSlot}
+            <Flex alignItems='center' gap={2}>
+              {navSlot}
+              <Separator orientation='vertical' h={4} />
+              <IconButton variant='ghost' size='sm' asChild>
+                <Link target='_blank' rel='noopener noreferrer' href='https://github.com/developmentseed/deck.gl-healpix'>
+                  <CollecticonBrandGithub />
+                </Link>
+              </IconButton>
+            </Flex>
           </Flex>
 
           {children}
