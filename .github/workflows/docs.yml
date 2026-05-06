@@ -1,0 +1,65 @@
+name: Deploy Docs
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "!v*-alpha*"
+      - "!v*-beta*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install
+        run: npm i
+
+      - name: Build packages and examples
+        run: npm run build
+
+      - name: Stage built examples for docs
+        run: |
+          export VITE_BASE_URL=https://deck.gl-healpix.ds.io/examples
+          mkdir -p dist/examples
+          for dir in examples/*/; do
+            example=$(basename "$dir")
+            if [[ "$example" == "_shared" ]] || [[ ! -d "${dir}dist" ]]; then
+              continue
+            fi
+            mkdir -p "dist/examples/${example}"
+            cp -r "${dir}dist/." "dist/examples/${example}/"
+          done
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
