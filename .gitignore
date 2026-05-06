@@ -36,3 +36,5 @@ yarn-error.log*
 
 # Auto-generated for GPU readback tests (`npm run gen:gpu-shaders`)
 test/gpu/shader-chunks.gen.mjs
+
+docs/superpowers/plans
