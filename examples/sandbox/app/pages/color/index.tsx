@@ -25,7 +25,8 @@ import {
 } from './sentinel-zarr';
 import { BAND_CHOICES, BAND_INDEX, BandLabel } from './sentinel-zarr-bands';
 
-const base = import.meta.env.VITE_STATIC_FILES_URL || import.meta.env.VITE_BASE_URL;
+const base =
+  import.meta.env.VITE_STATIC_FILES_URL || import.meta.env.VITE_BASE_URL;
 const ZARR_URL = `${base}/sentinel-healpix.zarr`;
 
 export type BandVisualizationMode =
