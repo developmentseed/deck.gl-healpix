@@ -17,8 +17,7 @@ const config: Config = {
     ]
   },
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1',
-    '^virtual:tile-grid-worker$': '<rootDir>/src/__mocks__/worker-code.ts'
+    '^(\\.{1,2}/.*)\\.js$': '$1'
   }
 };
 

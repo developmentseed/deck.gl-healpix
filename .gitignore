@@ -13,9 +13,15 @@ Thumbs.db
 *.swp
 *.swo
 
-# Environment
-.env
-.env.local
+
+################################################
+# Environment files
+#
+# Common files used to store environment
+################################################
+
+.env*
+!.env.example
 
 # Test coverage
 coverage/
@@ -24,3 +30,9 @@ coverage/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Worktrees
+.worktrees/
+
+# Auto-generated for GPU readback tests (`npm run gen:gpu-shaders`)
+test/gpu/shader-chunks.gen.mjs
