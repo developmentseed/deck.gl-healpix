@@ -12,6 +12,17 @@ import { CollecticonBrandGithub } from '@devseed-ui/collecticons-chakra';
 import { BrowserRouter, NavLink, NavLinkProps } from 'react-router';
 import system from '../styles/theme';
 
+import logo from './logo.svg';
+
+// If using a router add the public url to the base path.
+const publicUrl = import.meta.env.VITE_BASE_URL || '';
+
+const baseName = new URL(
+  publicUrl.startsWith('http')
+    ? publicUrl
+    : `https://ds.io/${publicUrl.replace(/^\//, '')}`
+).pathname;
+
 export function PageNavLink(props: NavLinkProps) {
   return (
     <Button
@@ -40,7 +51,7 @@ export function PageLayout(props: {
 
   return (
     <ChakraProvider value={system}>
-      <BrowserRouter>
+      <BrowserRouter basename={baseName}>
         <Flex w='100vw' h='100vh' flexFlow='column'>
           <Flex
             alignItems='center'
@@ -50,7 +61,7 @@ export function PageLayout(props: {
             p={4}
           >
             <Heading display='flex' gap={2} alignItems='center'>
-              <Image src='/logo.svg' alt='Logo' boxSize='32px' />
+              <Image src={logo} alt='Logo' boxSize='32px' />
               {title}
             </Heading>
             <Flex alignItems='center' gap={2}>

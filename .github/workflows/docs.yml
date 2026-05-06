@@ -36,18 +36,25 @@ jobs:
       - name: Install
         run: npm i
 
-      - name: Build packages and examples
-        run: npm run build
+      - name: Build packages
+        run: npm run build -- --scope '@developmentseed/*'
 
-      - name: Stage built examples for docs
+      - name: Build examples
         run: |
-          export VITE_BASE_URL=https://deck.gl-healpix.ds.io/examples
           mkdir -p dist/examples
           for dir in examples/*/; do
             example=$(basename "$dir")
-            if [[ "$example" == "_shared" ]] || [[ ! -d "${dir}dist" ]]; then
+            if [[ "$example" == "_shared" ]]; then
               continue
             fi
+
+            echo "Building example: $example"
+            cd $dir
+            cp .env.example .env
+            export VITE_BASE_URL=https://deck.gl-healpix.ds.io/examples/$example
+            npm run build
+            cd ../..
+            echo "Copying example: $example"
             mkdir -p "dist/examples/${example}"
             cp -r "${dir}dist/." "dist/examples/${example}/"
           done
