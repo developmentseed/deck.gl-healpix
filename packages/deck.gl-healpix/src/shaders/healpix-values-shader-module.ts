@@ -16,10 +16,10 @@ in float vHealpixCellIndex;
 uniform highp sampler2D healpixValuesTexture;
 
 uniform healpixValuesUniforms {
-  int uDimensions;
-  int uColorMode;
-  int uValuesWidth;
-  int uTexelsPerCell;
+  highp int uDimensions;
+  highp int uColorMode;
+  highp int uValuesWidth;
+  highp int uTexelsPerCell;
 } healpixValues;
 
 const int HEALPIX_COLOR_MODE_SCALAR = 1;
@@ -27,9 +27,9 @@ const int HEALPIX_COLOR_MODE_SCALAR_ALPHA = 2;
 const int HEALPIX_COLOR_MODE_RGB = 3;
 const int HEALPIX_COLOR_MODE_RGBA = 4;
 
-int healpixCell;
-int healpixDimensions;
-int healpixColorMode;
+highp int healpixCell;
+highp int healpixDimensions;
+highp int healpixColorMode;
 vec4 healpixSelectedValues;
 
 // Forward declarations for the custom HEALPix hooks. The hook system emits
@@ -43,16 +43,16 @@ vec4 healpixSelectedValues;
 void HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry);
 void HEALPIX_RESCALE_VALUES(inout vec4 selectedValues, FragmentGeometry geometry);
 
-float healpixValueAt(int channel) {
+float healpixValueAt(highp int channel) {
   if (channel < 0 || channel >= healpixDimensions) {
     return 0.0;
   }
 
-  int texel = channel / 4;
-  int component = channel - texel * 4;
-  int valueIndex = healpixCell * healpixValues.uTexelsPerCell + texel;
-  int x = valueIndex % healpixValues.uValuesWidth;
-  int y = valueIndex / healpixValues.uValuesWidth;
+  highp int texel = channel / 4;
+  highp int component = channel - texel * 4;
+  highp int valueIndex = healpixCell * healpixValues.uTexelsPerCell + texel;
+  highp int x = valueIndex % healpixValues.uValuesWidth;
+  highp int y = valueIndex / healpixValues.uValuesWidth;
   vec4 rgba = texelFetch(healpixValuesTexture, ivec2(x, y), 0);
 
   if (component == 0) return rgba.r;
