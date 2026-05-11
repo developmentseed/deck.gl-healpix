@@ -10,6 +10,7 @@ import {
   Slider,
   Text
 } from '@chakra-ui/react';
+import { ControlPanel } from '$shared/components/control-panel';
 import {
   HealpixCellsLayer,
   HealpixScheme,
@@ -146,28 +147,10 @@ export default function PageAnimation() {
 
   return (
     <Flex w='100%' h='100%' direction='column' position='relative'>
-      {/* ── Controls panel (top-left) ── */}
-      <Flex
-        position='absolute'
-        top={4}
-        left={4}
-        zIndex={1000}
-        bg='white'
-        borderRadius='md'
-        boxShadow='md'
-        p={4}
-        w='30rem'
-        flexFlow='column'
-        gap={4}
+      <ControlPanel
+        title='HEALPix cells dynamically generated'
+        description='Half of the total cells for the chosen nside are generated and animated, shifting them over the different frames.'
       >
-        <Text fontStyle='italic'>
-          HEALPix cells dynamically generated
-          <br />
-          <Text as='span' fontSize='sm'>
-            Half of the total cells for the chosen nside are generated and
-            animated, shifting them over the different frames.
-          </Text>
-        </Text>
         {/* Projection dropdown */}
         <Field.Root>
           <Field.Label fontSize='sm' fontWeight='semibold' mb={1}>
@@ -250,7 +233,7 @@ export default function PageAnimation() {
             <Text fontSize='sm'>FPS: {fps.toFixed(1)}</Text>
           </Flex>
         </Field.Root>
-      </Flex>
+      </ControlPanel>
       {/* Map area */}
       <Box flex='1' position='relative'>
         <Map

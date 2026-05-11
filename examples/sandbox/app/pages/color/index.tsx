@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Map from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Box, Field, Flex, NativeSelect, Slider, Text } from '@chakra-ui/react';
+import { ControlPanel } from '$shared/components/control-panel';
 import {
   HEALPIX_COLOR_MODE_RGB,
   HEALPIX_COLOR_MODE_SCALAR,
@@ -180,33 +181,10 @@ export default function PageColor() {
 
   return (
     <Flex w='100%' h='100%' flexFlow='column' position='relative'>
-      <Flex
-        position='absolute'
-        top={4}
-        left={4}
-        zIndex={1000}
-        bg='white'
-        borderRadius='md'
-        boxShadow='md'
-        p={4}
-        minW='220px'
-        flexFlow='column'
-        gap={4}
-        w='30rem'
-        maxH='90vh'
-        overflowY='auto'
+      <ControlPanel
+        title='Sentinel 2 scene with 10 bands in healpix'
+        description='Cell coloring is computed on the GPU from the selected source values and color mode. RGB visualizations render selected values directly, while scalar visualizations map through a color scheme after optional filtering and rescaling.'
       >
-        <Text fontStyle='italic'>
-          Sentinel 2 scene with 10 bands in healpix
-          <br />
-          <Text as='span' fontSize='sm'>
-            Cell coloring is computed on the GPU from the selected source values
-            and color mode. RGB visualizations render selected values directly,
-            while scalar visualizations map through a color scheme after
-            optional filtering and rescaling.
-          </Text>
-        </Text>
-
         {loadPending && <Text fontSize='sm'>Loading Zarr…</Text>}
         {loadError && (
           <Text color='red.fg' fontSize='sm'>
@@ -331,7 +309,7 @@ export default function PageColor() {
             onSchemeChange={setColorScheme}
           />
         )}
-      </Flex>
+      </ControlPanel>
 
       <Box flex='1' position='relative' minH={0}>
         <Map
