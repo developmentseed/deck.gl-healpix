@@ -1,8 +1,20 @@
 import type { CompositeLayerProps } from '@deck.gl/core';
+import type { ShaderModule } from '@luma.gl/shadertools';
 import type { CellIdArray } from './cell-ids';
 
 /** HEALPix pixel numbering scheme. */
 export type HealpixScheme = 'nest' | 'ring';
+
+export const HEALPIX_COLOR_MODE_SCALAR = 1;
+export const HEALPIX_COLOR_MODE_SCALAR_ALPHA = 2;
+export const HEALPIX_COLOR_MODE_RGB = 3;
+export const HEALPIX_COLOR_MODE_RGBA = 4;
+
+export type HealpixColorMode =
+  | typeof HEALPIX_COLOR_MODE_SCALAR
+  | typeof HEALPIX_COLOR_MODE_SCALAR_ALPHA
+  | typeof HEALPIX_COLOR_MODE_RGB
+  | typeof HEALPIX_COLOR_MODE_RGBA;
 
 export type { CellIdArray };
 
@@ -20,17 +32,8 @@ export type { CellIdArray };
  * `values` is an interleaved flat array. Cell `i` occupies indices
  * `i * dimensions` through `i * dimensions + dimensions - 1`.
  *
- * ## `dimensions` interpretation
- *
- * | `dimensions` | Interpretation |
- * |---|---|
- * | `1` | Scalar → normalized through `[min, max]` → colorMap LUT → RGBA |
- * | `2` | Scalar (→ colorMap) + opacity multiplier (0–1) |
- * | `3` | Direct RGB in range 0–1; colorMap/min/max ignored; alpha = 1 |
- * | `4` | Direct RGBA in range 0–1; colorMap/min/max ignored |
- *
- * Values beyond 4 dimensions are reserved for future band math. Cells
- * with `dimensions > 4` render as transparent with a console warning.
+ * `dimensions` is the number of source values per cell. `colorMode` controls
+ * how selected values are interpreted for rendering.
  */
 export type HealpixFrameObject = {
   /** Overrides root `nside`. */
@@ -48,11 +51,26 @@ export type HealpixFrameObject = {
   min?: number;
   /** Overrides root `max`. Default: `1`. */
   max?: number;
+  /** Render interpretation for selected values. Default: `HEALPIX_COLOR_MODE_SCALAR`. */
+  colorMode?: HealpixColorMode;
+  /** Inclusive lower visibility bound for dimensions 1 and 2. Default: unbounded. */
+  filterMin?: number;
+  /** Inclusive upper visibility bound for dimensions 1 and 2. Default: unbounded. */
+  filterMax?: number;
   /**
-   * Number of values per cell. Controls color computation mode.
-   * Default: `1`. See type-level docs for full interpretation table.
+   * Value mapped to colorMap index 0 for dimensions 1 and 2.
+   * Defaults to `min` for backwards compatibility, then `0`.
    */
-  dimensions?: 1 | 2 | 3 | 4;
+  rescaleMin?: number;
+  /**
+   * Value mapped to colorMap index 255 for dimensions 1 and 2.
+   * Defaults to `max` for backwards compatibility, then `1`.
+   */
+  rescaleMax?: number;
+  /**
+   * Number of source values per cell. Default: `1`.
+   */
+  dimensions?: number;
   /**
    * ColorMap LUT: exactly 256 × 4 = 1024 RGBA bytes.
    * Index 0 maps to `min`, index 255 maps to `max`.
@@ -90,9 +108,10 @@ export type HealpixFrameObject = {
  * />
  * ```
  *
- * ## Color dimensions
+ * ## Color pipeline
  *
- * See `HealpixFrameObject` for the full `dimensions` interpretation table.
+ * `dimensions` is the number of source values per cell. `colorMode` controls
+ * how selected values are interpreted for rendering.
  */
 export type HealpixCellsLayerProps = {
   /**
@@ -113,15 +132,36 @@ export type HealpixCellsLayerProps = {
    * Length must equal `cellIds.length * dimensions`.
    */
   values?: ArrayLike<number>;
-  /** Value mapped to colorMap index 0. Default: `0`. */
-  min?: number;
-  /** Value mapped to colorMap index 255. Default: `1`. */
-  max?: number;
   /**
-   * Number of values per cell. Default: `1`.
-   * See `HealpixFrameObject` for the full interpretation table.
+   * Value mapped to colorMap index 0. Default: `0`.
+   * @deprecated Use `rescaleMin` instead.
    */
-  dimensions?: 1 | 2 | 3 | 4;
+  min?: number;
+  /**
+   * Value mapped to colorMap index 255. Default: `1`.
+   * @deprecated Use `rescaleMax` instead.
+   */
+  max?: number;
+  /** Render interpretation for selected values. Default: `HEALPIX_COLOR_MODE_SCALAR`. */
+  colorMode?: HealpixColorMode;
+  /** Inclusive lower visibility bound for dimensions 1 and 2. Default: unbounded. */
+  filterMin?: number;
+  /** Inclusive upper visibility bound for dimensions 1 and 2. Default: unbounded. */
+  filterMax?: number;
+  /**
+   * Value mapped to colorMap index 0 for dimensions 1 and 2.
+   * Defaults to `min` for backwards compatibility, then `0`.
+   */
+  rescaleMin?: number;
+  /**
+   * Value mapped to colorMap index 255 for dimensions 1 and 2.
+   * Defaults to `max` for backwards compatibility, then `1`.
+   */
+  rescaleMax?: number;
+  /**
+   * Number of source values per cell. Default: `1`.
+   */
+  dimensions?: number;
   /**
    * ColorMap LUT: exactly 256 × 4 = 1024 RGBA bytes (default: black→white).
    * Used as a shared default when frames do not provide their own colorMap.
@@ -131,4 +171,6 @@ export type HealpixCellsLayerProps = {
   frames?: HealpixFrameObject[];
   /** Active frame index into `frames`. Clamped to `[0, frames.length - 1]`. Default: `0`. */
   currentFrame?: number;
+  /** Custom shader modules appended after the built-in HEALPix color pipeline. */
+  shaderModules?: ShaderModule[];
 } & CompositeLayerProps;

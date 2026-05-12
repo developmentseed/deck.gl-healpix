@@ -6,6 +6,7 @@
   ],
   "description": "Monorepo for HEALPix deck.gl layers and related packages",
   "scripts": {
+    "set-workspace": "export NX_WORKSPACE_ROOT_PATH=$(pwd)",
     "build": "lerna run build",
     "build:watch": "lerna run build:watch",
     "clean": "lerna run clean",

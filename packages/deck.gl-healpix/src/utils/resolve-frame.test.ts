@@ -1,6 +1,11 @@
 import { resolveFrame } from './resolve-frame';
 import { DEFAULT_COLORMAP } from './color-map';
-import type { HealpixCellsLayerProps } from '../types/layer-props';
+import {
+  HEALPIX_COLOR_MODE_RGB,
+  HEALPIX_COLOR_MODE_SCALAR,
+  HEALPIX_COLOR_MODE_SCALAR_ALPHA,
+  type HealpixCellsLayerProps
+} from '../types/layer-props';
 
 const validIds = new Uint32Array([1, 2, 3]);
 const validValues = new Float32Array([0.1, 0.2, 0.3]); // dim=1, 3 cells
@@ -26,6 +31,7 @@ describe('resolveFrame — single-frame mode (no frames array)', () => {
     expect(result.min).toBe(0);
     expect(result.max).toBe(1);
     expect(result.dimensions).toBe(1);
+    expect(result.colorMode).toBe(HEALPIX_COLOR_MODE_SCALAR);
     expect(result.colorMap).toBe(DEFAULT_COLORMAP);
   });
 
@@ -37,6 +43,7 @@ describe('resolveFrame — single-frame mode (no frames array)', () => {
         min: -1,
         max: 10,
         dimensions: 3,
+        colorMode: HEALPIX_COLOR_MODE_RGB,
         colorMap: myColorMap,
         values: new Float32Array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]) // 3 cells × 3 dims
       })
@@ -45,7 +52,41 @@ describe('resolveFrame — single-frame mode (no frames array)', () => {
     expect(result.min).toBe(-1);
     expect(result.max).toBe(10);
     expect(result.dimensions).toBe(3);
+    expect(result.colorMode).toBe(HEALPIX_COLOR_MODE_RGB);
     expect(result.colorMap).toBe(myColorMap);
+  });
+
+  it('defaults filter range to unbounded and rescale range to min/max', () => {
+    const result = resolveFrame(makeProps({ min: -2, max: 8 }));
+    expect(result.filterMin).toBe(-Infinity);
+    expect(result.filterMax).toBe(Infinity);
+    expect(result.rescaleMin).toBe(-2);
+    expect(result.rescaleMax).toBe(8);
+  });
+
+  it('uses explicit root filter and rescale ranges', () => {
+    const result = resolveFrame(
+      makeProps({
+        filterMin: 0.2,
+        filterMax: 0.9,
+        rescaleMin: 0.1,
+        rescaleMax: 1.2
+      })
+    );
+    expect(result.filterMin).toBe(0.2);
+    expect(result.filterMax).toBe(0.9);
+    expect(result.rescaleMin).toBe(0.1);
+    expect(result.rescaleMax).toBe(1.2);
+  });
+
+  it('defaults color mode to scalar regardless of dimensions', () => {
+    const result = resolveFrame(
+      makeProps({
+        dimensions: 5,
+        values: new Float32Array(15)
+      })
+    );
+    expect(result.colorMode).toBe(HEALPIX_COLOR_MODE_SCALAR);
   });
 });
 
@@ -75,6 +116,47 @@ describe('resolveFrame — multi-frame mode', () => {
     expect(result.values).toBe(frameVals);
     expect(result.min).toBe(-5);
     expect(result.max).toBe(5);
+  });
+
+  it('frame filter and rescale fields override root props', () => {
+    const result = resolveFrame(
+      makeProps({
+        filterMin: 0,
+        filterMax: 1,
+        rescaleMin: 0,
+        rescaleMax: 1,
+        frames: [
+          {
+            values: validValues,
+            filterMin: 0.25,
+            filterMax: 0.75,
+            rescaleMin: -1,
+            rescaleMax: 2
+          }
+        ],
+        currentFrame: 0
+      })
+    );
+    expect(result.filterMin).toBe(0.25);
+    expect(result.filterMax).toBe(0.75);
+    expect(result.rescaleMin).toBe(-1);
+    expect(result.rescaleMax).toBe(2);
+  });
+
+  it('frame colorMode overrides root colorMode', () => {
+    const result = resolveFrame(
+      makeProps({
+        colorMode: HEALPIX_COLOR_MODE_RGB,
+        frames: [
+          {
+            values: validValues,
+            colorMode: HEALPIX_COLOR_MODE_SCALAR_ALPHA
+          }
+        ],
+        currentFrame: 0
+      })
+    );
+    expect(result.colorMode).toBe(HEALPIX_COLOR_MODE_SCALAR_ALPHA);
   });
 
   it('root props fill gaps not set on frame', () => {
@@ -113,13 +195,13 @@ describe('resolveFrame — validation', () => {
       resolveFrame({
         cellIds: validIds,
         values: validValues
-      } as HealpixCellsLayerProps)
+      } as any)
     ).toThrow(/nside/);
   });
 
   it('throws if cellIds is missing', () => {
     expect(() =>
-      resolveFrame({ nside: 64, values: validValues } as HealpixCellsLayerProps)
+      resolveFrame({ nside: 64, values: validValues } as any)
     ).toThrow(/cellIds/);
   });
 

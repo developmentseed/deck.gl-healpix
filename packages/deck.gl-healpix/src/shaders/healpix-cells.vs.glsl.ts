@@ -5,9 +5,11 @@
 export const HEALPIX_CELLS_VS_MAIN: string = /* glsl */ `
 in uint cellIdLo;
 in uint cellIdHi;
+in float healpixCellIndex;
 in vec3 positions;
 
 out vec4 vColor;
+out float vHealpixCellIndex;
 
 void main() {
   uvec2 cellId = uvec2(cellIdLo, cellIdHi);
@@ -47,6 +49,7 @@ void main() {
   );
 
   vColor = vec4(1.0);
+  vHealpixCellIndex = healpixCellIndex;
   DECKGL_FILTER_COLOR(vColor, geometry);
 }
 `;

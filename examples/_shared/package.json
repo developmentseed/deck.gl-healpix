@@ -2,7 +2,7 @@
   "name": "deck.gl-healpix-demos-shared",
   "private": true,
   "description": "Shared components and utilities for deck.gl-healpix demos.",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "license": "MIT",
   "exports": {
     "./*": "./*"
@@ -10,6 +10,7 @@
   "dependencies": {
     "@chakra-ui/react": "^3.34.0",
     "@deck.gl/mapbox": "^9.3.1",
+    "@devseed-ui/collecticons-chakra": "^4.0.0",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "maplibre-gl": "^5.21.0",

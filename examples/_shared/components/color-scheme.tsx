@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   Box,
   Portal,
@@ -18,7 +18,7 @@ export { schemeFns, type ColorSchemeName };
 
 function makeBg(scheme: keyof typeof schemeFns) {
   const scale = scaleSequential((t) => schemeFns[scheme](t)).domain([0, 1]);
-  const colors = [];
+  const colors: string[] = [];
   for (let i = 0; i <= 1; i += 0.01) {
     colors.push(scale(i));
   }

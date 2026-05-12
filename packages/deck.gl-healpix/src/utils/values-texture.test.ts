@@ -38,6 +38,36 @@ describe('packValuesData', () => {
     expect(data[3]).toBeCloseTo(0.4);
   });
 
+  it('dim=5: packs one cell into two adjacent RGBA texels', () => {
+    const { data, width, height, texelsPerCell } = packValuesData(
+      [0.1, 0.2, 0.3, 0.4, 0.5],
+      5,
+      1,
+      MAX
+    );
+    expect(width).toBe(2);
+    expect(height).toBe(1);
+    expect(texelsPerCell).toBe(2);
+    expect(data[0]).toBeCloseTo(0.1);
+    expect(data[1]).toBeCloseTo(0.2);
+    expect(data[2]).toBeCloseTo(0.3);
+    expect(data[3]).toBeCloseTo(0.4);
+    expect(data[4]).toBeCloseTo(0.5);
+    expect(data[5]).toBe(0);
+  });
+
+  it('dim=10: packs each cell into ceil(dimensions / 4) texels', () => {
+    const values = [
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20
+    ];
+    const { data, texelsPerCell } = packValuesData(values, 10, 2, MAX);
+    expect(texelsPerCell).toBe(3);
+    expect(data[0]).toBe(1);
+    expect(data[8]).toBe(9);
+    expect(data[12]).toBe(11);
+    expect(data[20]).toBe(19);
+  });
+
   it('two cells, dim=1: each in a separate texel', () => {
     const { data, width } = packValuesData([0.2, 0.8], 1, 2, MAX);
     expect(width).toBe(2);

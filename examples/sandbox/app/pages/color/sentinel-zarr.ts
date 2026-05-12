@@ -1,6 +1,13 @@
 /**
  * Zarr layout: `values` float32 [npix, NBANDS] (row-major), `cell_id` int64 [npix].
  * Column order matches `attributes.bands` in the group zarr.json (see `BAND_ORDER`).
+ *
+ * The `extractColumn`, `buildCompositeRgb`, and `buildNdvi` helpers below
+ * pre-select / derive per-cell values on the JavaScript side. The current page
+ * (`./index.tsx`) instead uploads all 10 bands once and picks channels in the
+ * fragment shader via the `HEALPIX_SELECT_VALUES` hook; the JS helpers are
+ * kept here as a documented alternative for callers that prefer to compute
+ * values on the CPU (see the note in `./index.tsx`).
  */
 import * as zarr from 'zarrita';
 import { BAND_INDEX, NBANDS } from './sentinel-zarr-bands';
@@ -60,7 +67,8 @@ export function extractColumn(
   return out;
 }
 
-const RGB_NUM = 0.3;
+/** Reflectance value mapped to RGB output `1.0` for the composite stretches. */
+export const RGB_NUM = 0.3;
 
 function clamp01(x: number): number {
   return Math.min(1, Math.max(0, x));
@@ -70,7 +78,7 @@ function stretchRgb(x: number): number {
   return clamp01(x / RGB_NUM);
 }
 
-const COMPOSITE_COLS: Record<
+export const COMPOSITE_COLS: Record<
   'true_color' | 'infrared_false_color' | 'swir',
   { r: number; g: number; b: number }
 > = {

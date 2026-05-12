@@ -1,0 +1,95 @@
+# This workflow performs basic checks:
+#
+#   1. run a preparation step to install and cache node modules
+#   2. once prep succeeds, lint and test run in parallel
+#
+# The checks only run on non-draft Pull Requests. They don't run on the main
+# branch prior to deploy. It's recommended to use branch protection to avoid
+# pushes straight to 'main'.
+
+name: Checks
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prep:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: restore lerna
+        uses: actions/cache@v5
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install
+        run: npm install
+
+  lint:
+    needs: prep
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: restore lerna
+        uses: actions/cache@v5
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install
+        run: npm install
+
+      - name: Lint
+        run: npm run lint
+
+  test:
+    needs: prep
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: restore lerna
+        uses: actions/cache@v5
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install
+        run: npm install
+
+      - name: Test
+        run: npm run test

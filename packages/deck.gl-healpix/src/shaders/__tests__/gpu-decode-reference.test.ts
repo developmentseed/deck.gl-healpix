@@ -208,12 +208,9 @@ describe('decodeNest', () => {
       const log2n = Math.log2(nside);
       const nside2 = BigInt(nside) * BigInt(nside);
       for (let face = 0; face < 12; face++) {
-        const ids = [
-          0n,
-          nside2 - 1n,
-          nside2 / 2n,
-          (nside2 * 3n) / 7n
-        ].map((k) => BigInt(face) * nside2 + k);
+        const ids = [0n, nside2 - 1n, nside2 / 2n, (nside2 * 3n) / 7n].map(
+          (k) => BigInt(face) * nside2 + k
+        );
         for (const id of ids) {
           const truth = nest2fxy(nside, Number(id));
           const cellId = fromBig(id);
@@ -230,8 +227,9 @@ describe('decodeNest', () => {
     const nside2 = BigInt(nside) * BigInt(nside);
     let state = 0x9e3779b97f4a7c15n;
     const rand = () => {
-      state = (state * 6364136223846793005n + 1442695040888963407n) &
-              0xffffffffffffffffn;
+      state =
+        (state * 6364136223846793005n + 1442695040888963407n) &
+        0xffffffffffffffffn;
       return state;
     };
     for (let trial = 0; trial < 200; trial++) {
@@ -293,8 +291,9 @@ describe('decodeRing', () => {
       const npix = 12n * n * n;
       let state = (BigInt(nside) * 0x9e3779b97f4a7c15n) & 0xffffffffffffffffn;
       const rand = () => {
-        state = (state * 6364136223846793005n + 1442695040888963407n) &
-                0xffffffffffffffffn;
+        state =
+          (state * 6364136223846793005n + 1442695040888963407n) &
+          0xffffffffffffffffn;
         return state;
       };
       const ids: bigint[] = [];

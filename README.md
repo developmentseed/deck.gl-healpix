@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/4166d5d5-65e3-4309-a63a-0a2d0cdf275d
 
 | Package | Description |
 | -------- | ----------- |
-| [`@developmentseed/deck.gl-healpix`](./packages/deck.gl-healpix/) | deck.gl layer for rendering [HEALPix](https://healpix.sourceforge.io/) cells on a map, with GPU-side colormaps and multi-frame animation. |
+| [`@developmentseed/deck.gl-healpix`](./packages/deck.gl-healpix/) | deck.gl layer for rendering [HEALPix](https://healpix.sourceforge.io/) cells on a map, with a GPU color pipeline (filter / rescale / colorMap), multi-frame animation, and pluggable fragment-shader hooks for custom GLSL. |
 
 Each package has its own **README** with installation, API usage, and examples—start there for day-to-day integration work.
 

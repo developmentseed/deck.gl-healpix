@@ -1,6 +1,6 @@
 {
   "name": "@developmentseed/deck.gl-healpix",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "HEALPix (Hierarchical Equal Area isoLatitude Pixelization) implementation in Deck.gl",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -50,7 +50,8 @@
     "@deck.gl/core": "~9.3.1",
     "@deck.gl/layers": "~9.3.1",
     "@luma.gl/core": "9.3.3",
-    "@luma.gl/engine": "9.3.3"
+    "@luma.gl/engine": "9.3.3",
+    "@luma.gl/shadertools": "9.3.3"
   },
   "devDependencies": {
     "healpix-ts": "^1.0.0"

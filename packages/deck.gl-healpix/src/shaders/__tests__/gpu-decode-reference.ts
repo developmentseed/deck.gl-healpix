@@ -203,7 +203,7 @@ export function decodeRing(
   if (u64_lt(cellId, eqLim)) {
     return decodeRingEquatorial(cellId, nside, polarLim);
   }
-  return decodeRingSouth(cellId, nside, npix);
+  return decodeRingSouth(cellId, npix);
 }
 
 function decodeRingNorth(cellId: U64, nside: number): DecodeResult {
@@ -247,7 +247,7 @@ function decodeRingEquatorial(
   return { face, ix, iy };
 }
 
-function decodeRingSouth(cellId: U64, nside: number, npix: U64): DecodeResult {
+function decodeRingSouth(cellId: U64, npix: U64): DecodeResult {
   const p = u64_sub(u64_sub(npix, cellId), [1, 0]);
   const onePlus2p = u64_add(u64_shl(p, 1), [1, 0]);
   const root = u64_isqrt(onePlus2p);

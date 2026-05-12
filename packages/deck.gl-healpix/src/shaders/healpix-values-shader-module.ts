@@ -1,0 +1,89 @@
+import type { Texture } from '@luma.gl/core';
+import type { ShaderModule } from '@luma.gl/shadertools';
+
+export type HealpixValuesProps = {
+  uDimensions: number;
+  uColorMode: number;
+  uValuesWidth: number;
+  uTexelsPerCell: number;
+  healpixValuesTexture: Texture;
+};
+
+export const healpixValuesShaderModule = {
+  name: 'healpixValues',
+  fs: `\
+in float vHealpixCellIndex;
+uniform highp sampler2D healpixValuesTexture;
+
+uniform healpixValuesUniforms {
+  highp int uDimensions;
+  highp int uColorMode;
+  highp int uValuesWidth;
+  highp int uTexelsPerCell;
+} healpixValues;
+
+const int HEALPIX_COLOR_MODE_SCALAR = 1;
+const int HEALPIX_COLOR_MODE_SCALAR_ALPHA = 2;
+const int HEALPIX_COLOR_MODE_RGB = 3;
+const int HEALPIX_COLOR_MODE_RGBA = 4;
+
+highp int healpixCell;
+highp int healpixDimensions;
+highp int healpixColorMode;
+vec4 healpixSelectedValues;
+
+// Forward declarations for the custom HEALPix hooks. The hook system emits
+// the no-op bodies (and any user injections) after the deck.gl hook bodies,
+// but our injections call them from inside DECKGL_FILTER_COLOR. GLSL requires
+// a declaration before the call site, so declare them here.
+//
+// The hooks follow the deck.gl DECKGL_FILTER_COLOR pattern: inout vec4 is
+// the working selection. Hook bodies must mutate the parameter
+// (selectedValues).
+void HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry);
+void HEALPIX_RESCALE_VALUES(inout vec4 selectedValues, FragmentGeometry geometry);
+
+float healpixValueAt(highp int channel) {
+  if (channel < 0 || channel >= healpixDimensions) {
+    return 0.0;
+  }
+
+  highp int texel = channel / 4;
+  highp int component = channel - texel * 4;
+  highp int valueIndex = healpixCell * healpixValues.uTexelsPerCell + texel;
+  highp int x = valueIndex % healpixValues.uValuesWidth;
+  highp int y = valueIndex / healpixValues.uValuesWidth;
+  vec4 rgba = texelFetch(healpixValuesTexture, ivec2(x, y), 0);
+
+  if (component == 0) return rgba.r;
+  if (component == 1) return rgba.g;
+  if (component == 2) return rgba.b;
+  if (component == 3) return rgba.a;
+  return 0.0;
+}
+`,
+  inject: {
+    'fs:DECKGL_FILTER_COLOR': {
+      order: -40,
+      injection: `\
+healpixCell = int(vHealpixCellIndex + 0.5);
+healpixDimensions = healpixValues.uDimensions;
+healpixColorMode = healpixValues.uColorMode;
+healpixSelectedValues = vec4(0.0);
+
+if (healpixDimensions >= 1) healpixSelectedValues.x = healpixValueAt(0);
+if (healpixDimensions >= 2) healpixSelectedValues.y = healpixValueAt(1);
+if (healpixDimensions >= 3) healpixSelectedValues.z = healpixValueAt(2);
+if (healpixDimensions >= 4) healpixSelectedValues.w = healpixValueAt(3);
+
+HEALPIX_SELECT_VALUES(healpixSelectedValues, geometry);
+`
+    }
+  },
+  uniformTypes: {
+    uDimensions: 'i32',
+    uColorMode: 'i32',
+    uValuesWidth: 'i32',
+    uTexelsPerCell: 'i32'
+  }
+} as const satisfies ShaderModule<HealpixValuesProps>;
