@@ -1,4 +1,4 @@
-![HEALPix Banner](../../docs/healpix-banner.png)
+![HEALPix Banner](https://raw.githubusercontent.com/developmentseed/deck.gl-healpix/main/docs/healpix-banner.png)
 
 <p align='center'>
   <a href='https://github.com/developmentseed/healpix-ts'>HEALPix Typescript</a> | <a href='https://github.com/developmentseed/deck.gl-healpix'>HEALPix Deck.gl Layer</a> 
@@ -320,17 +320,6 @@ import type {
 ## Development
 
 The published library lives in `packages/@developmentseed/deck.gl-healpix`. The repo is an npm-workspaces + [Lerna](https://lerna.js.org/) monorepo. Shared TypeScript, Rollup, and tooling are at the root; run commands from the repo root.
-
-```bash
-npm install
-npm run build         # lerna: build all packages
-npm run build:watch  # lerna: watch
-npm run ts-check     # tsc --noEmit (per package)
-npm run lint
-npm test
-# npm run versionup   # bump versions (no tag/push) before a release
-# npm run publish:from  # lerna publish from-package (not private)
-```
 
 ## License
 
