@@ -2,7 +2,7 @@
   "name": "deck.gl-healpix-sandbox",
   "private": true,
   "description": "Sandbox for deck.gl-healpix.",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "author": {
     "name": "Daniel da Silva",
     "email": "daniel@develpmentseed.org",
