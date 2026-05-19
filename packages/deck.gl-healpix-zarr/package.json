@@ -1,0 +1,52 @@
+{
+  "name": "@developmentseed/deck.gl-healpix-zarr",
+  "version": "0.1.0",
+  "description": "HEALPix Zarr tile pyramid layer for deck.gl",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "rollup -c ../../rollup.config.mjs",
+    "build:watch": "rollup -c ../../rollup.config.mjs --watch",
+    "test": "node --experimental-vm-modules ../../node_modules/.bin/jest",
+    "ts-check": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "author": {
+    "name": "Daniel da Silva",
+    "email": "daniel@developmentseed.org"
+  },
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "peerDependencies": {
+    "@deck.gl/core": "~9.3.1",
+    "@deck.gl/geo-layers": "~9.3.1",
+    "@deck.gl/layers": "~9.3.1",
+    "@luma.gl/core": "9.3.3",
+    "@luma.gl/engine": "9.3.3"
+  },
+  "dependencies": {
+    "@developmentseed/deck.gl-healpix": "*",
+    "healpix-ts": "^1.0.0",
+    "zarrita": "^0.6.1"
+  },
+  "devDependencies": {
+    "@deck.gl/core": "~9.3.1",
+    "@deck.gl/geo-layers": "~9.3.1",
+    "@deck.gl/layers": "~9.3.1",
+    "@luma.gl/core": "9.3.3",
+    "@luma.gl/engine": "9.3.3"
+  }
+}
