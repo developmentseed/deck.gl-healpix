@@ -1,9 +1,6 @@
 import { useState } from 'react';
 import { Flex, Heading, IconButton, Text } from '@chakra-ui/react';
-import {
-  CollecticonSlidersHorizontal,
-  CollecticonXmarkSmall
-} from '@devseed-ui/collecticons-chakra';
+import { FaSliders, FaXmark } from 'react-icons/fa6';
 
 export function ControlPanel({
   children,
@@ -32,7 +29,7 @@ export function ControlPanel({
           onClick={() => setIsOpen(true)}
           aria-label='Show controls'
         >
-          <CollecticonSlidersHorizontal />
+          <FaSliders />
         </IconButton>
       )}
 
@@ -43,10 +40,12 @@ export function ControlPanel({
           left={4}
           zIndex={1000}
           bg='white'
-          borderRadius='md'
-          boxShadow='md'
+          borderRadius='lg'
+          boxShadow='lg'
+          borderWidth='1px'
+          borderColor='border.muted'
           p={4}
-          w={{ base: 'calc(100vw - 2rem)', md: '30rem' }}
+          w={{ base: 'calc(100vw - 2rem)', md: '22rem' }}
           maxH='90vh'
           overflowY='auto'
           flexFlow='column'
@@ -64,14 +63,18 @@ export function ControlPanel({
             right={2}
             zIndex={1001}
           >
-            <CollecticonXmarkSmall />
+            <FaXmark />
           </IconButton>
           {(title || description) && (
-            <Flex flexFlow='column' gap={2} pr={8}>
-              {title && <Heading fontSize='md'>{title}</Heading>}
+            <Flex flexFlow='column' gap={1} pr={{ base: 8, md: 0 }}>
+              {title && (
+                <Heading fontSize='md' fontWeight='semibold'>
+                  {title}
+                </Heading>
+              )}
 
               {description && (
-                <Text as='span' fontSize='sm' fontStyle='italic'>
+                <Text fontSize='xs' color='fg.muted' lineHeight='short'>
                   {description}
                 </Text>
               )}

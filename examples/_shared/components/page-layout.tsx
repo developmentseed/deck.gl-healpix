@@ -11,11 +11,7 @@ import {
   IconButton,
   LinkProps
 } from '@chakra-ui/react';
-import {
-  CollecticonBrandGithub,
-  CollecticonHamburgerMenu,
-  CollecticonXmarkSmall
-} from '@devseed-ui/collecticons-chakra';
+import { FaBars, FaGithub, FaXmark } from 'react-icons/fa6';
 import { BrowserRouter, NavLink } from 'react-router';
 import system from '../styles/theme';
 
@@ -99,7 +95,7 @@ export function PageLayout(props: {
                     rel='noopener noreferrer'
                     href='https://github.com/developmentseed/deck.gl-healpix'
                   >
-                    <CollecticonBrandGithub />
+                    <FaGithub />
                   </Link>
                 </IconButton>
                 {navItems && (
@@ -110,7 +106,7 @@ export function PageLayout(props: {
                     aria-label='Open menu'
                     onClick={() => setMenuOpen(true)}
                   >
-                    <CollecticonHamburgerMenu />
+                    <FaBars />
                   </IconButton>
                 )}
               </Flex>
@@ -124,7 +120,7 @@ export function PageLayout(props: {
             <Drawer.Content>
               <Drawer.CloseTrigger asChild>
                 <IconButton variant='ghost' size='sm'>
-                  <CollecticonXmarkSmall />
+                  <FaXmark />
                 </IconButton>
               </Drawer.CloseTrigger>
               <Drawer.Header p={4}>

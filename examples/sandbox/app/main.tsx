@@ -4,6 +4,7 @@ import { Route, Routes } from 'react-router';
 
 import PageAnimation from '$pages/animation';
 import PageColor from '$pages/color';
+import PagePaint from '$pages/paint';
 import { PageLayout } from '$shared/components/page-layout';
 
 // Root component.
@@ -17,12 +18,14 @@ function Root() {
       title='HEALPix Sandbox'
       navItems={[
         { label: 'Cell Rendering', to: '/' },
-        { label: 'Color Visualization', to: '/color' }
+        { label: 'Color Visualization', to: '/color' },
+        { label: 'Paint', to: '/paint' }
       ]}
     >
       <Routes>
         <Route path='/' element={<PageAnimation />} />
         <Route path='/color' element={<PageColor />} />
+        <Route path='/paint' element={<PagePaint />} />
       </Routes>
     </PageLayout>
   );
