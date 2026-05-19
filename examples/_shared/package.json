@@ -10,11 +10,11 @@
   "dependencies": {
     "@chakra-ui/react": "^3.34.0",
     "@deck.gl/mapbox": "^9.3.1",
-    "@devseed-ui/collecticons-chakra": "^4.0.0",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
     "maplibre-gl": "^5.21.0",
     "polished": "^4.3.1",
-    "react": "^19.2.4"
+    "react": "^19.2.4",
+    "react-icons": "^5.6.0"
   }
 }
