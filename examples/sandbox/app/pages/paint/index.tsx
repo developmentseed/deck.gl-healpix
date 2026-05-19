@@ -3,7 +3,7 @@ import Map, { type MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Box, Flex } from '@chakra-ui/react';
 
-import { DeckGlOverlay } from '$shared/components/deckgl-overlay.tsx';
+import { DeckGlOverlay } from '$shared/components/deckgl-overlay';
 
 import type { CellLine } from './colored-cells';
 import {

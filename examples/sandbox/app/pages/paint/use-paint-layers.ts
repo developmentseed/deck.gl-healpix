@@ -1,7 +1,7 @@
 import { useMemo, type RefObject } from 'react';
 import { PathLayer, TextLayer } from '@deck.gl/layers';
 import {
-  HEALPIX_COLOR_MODE_RGBA,
+  HEALPIX_COLOR_MODE_SCALAR,
   HealpixCellsLayer
 } from '@developmentseed/deck.gl-healpix';
 import { cellsToBoundingBox } from 'healpix-ts';
@@ -9,7 +9,11 @@ import type { MapRef } from 'react-map-gl/maplibre';
 
 import { bboxToPath } from './bbox';
 import { coloredCellIds, type ColoredCell } from './colored-cells';
-import { hexToRgb, paintColorRgba, PAINT_COLORS } from './colors';
+import {
+  hexToRgb,
+  PAINT_COLOR_MAP,
+  PAINT_COLORS
+} from './colors';
 import { cellCorners, cellToLonLat } from './healpix-geo';
 import { filterCellsWithVisibleLabels, LABEL_FONT_SIZE } from './label-fit';
 import type { HealpixScheme, PaintViewState } from './types';
@@ -67,16 +71,10 @@ export function usePaintLayers(opts: UsePaintLayersOptions) {
 
     if (cells.length > 0) {
       const ids = new Uint32Array(cells.length);
-      const values = new Float32Array(cells.length * 4);
+      const values = new Float32Array(cells.length);
       for (let i = 0; i < cells.length; i++) {
-        const { id, colorIndex } = cells[i];
-        ids[i] = id;
-        const [r, g, b, a] = paintColorRgba(colorIndex);
-        const o = i * 4;
-        values[o] = r;
-        values[o + 1] = g;
-        values[o + 2] = b;
-        values[o + 3] = a;
+        ids[i] = cells[i].id;
+        values[i] = cells[i].colorIndex;
       }
 
       layers.push(
@@ -86,8 +84,13 @@ export function usePaintLayers(opts: UsePaintLayersOptions) {
           scheme,
           cellIds: ids,
           values,
-          dimensions: 4,
-          colorMode: HEALPIX_COLOR_MODE_RGBA
+          dimensions: 1,
+          colorMode: HEALPIX_COLOR_MODE_SCALAR,
+          // The color map will have the colors for the first 5 color indices,
+          // so we need to rescale to 0-255.
+          colorMap: PAINT_COLOR_MAP,
+          rescaleMin: 0,
+          rescaleMax: 255
         }),
         new PathLayer<ColoredCell>({
           id: `cell-outlines-${nside}-${scheme}`,
