@@ -1,4 +1,4 @@
-# HEALPix Pyramid Zarr — Store Specification
+# HEALPix Pyramid Zarr store specification
 
 **Version:** 1.0  
 **Zarr format:** v3  
@@ -8,9 +8,9 @@
 
 ## Overview
 
-A HEALPix Pyramid Zarr store is a Zarr v3 group that encodes geospatial raster data in the HEALPix NESTED pixel scheme across multiple resolution levels. Each level holds a sparse set of cells (only cells with data are stored), indexed by a CSR-style `parent_offsets` array that allows efficient tile-based access.
+A HEALPix Pyramid Zarr store is a Zarr v3 group with geospatial raster data in HEALPix NESTED order at one or more resolution levels. Each level is sparse: only cells that contain data are stored. Cells are indexed with a CSR-style `parent_offsets` array so a reader can load one parent partition at a time (the usual tile access pattern).
 
-The store is designed to be generic: it can hold a single scalar variable (e.g. elevation, temperature) or multiple co-registered variables (e.g. satellite spectral bands), all sharing the same set of cell IDs at each resolution level.
+The same layout works for one variable (elevation, temperature) or several variables on the same cells (spectral bands). All bands at a level share the same `cell_id` ordering.
 
 ---
 
@@ -32,7 +32,7 @@ The store is designed to be generic: it can hold a single scalar variable (e.g. 
     ...
 ```
 
-All keys are **required** unless explicitly marked optional.
+All keys are required unless marked optional.
 
 ---
 
@@ -66,7 +66,7 @@ All keys are **required** unless explicitly marked optional.
 
 ## Resolution level group attributes (`nside_<N>/zarr.json`)
 
-One group exists for every power-of-two N in `[min_nside, base_nside]`.
+There is one group for each power-of-two N in `[min_nside, base_nside]`.
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
@@ -105,7 +105,7 @@ One group exists for every power-of-two N in `[min_nside, base_nside]`.
 | Encoding | little-endian bytes + zstd compression |
 | Fill value | `0` |
 
-Each element is the HEALPix NESTED cell index at resolution `nside`. Values are unique within a level. The array is sorted in ascending order of `parent_offsets` (i.e. cells belonging to the same parent are contiguous).
+Each element is the HEALPix NESTED cell index at resolution `nside`. Values are unique within a level. The array is sorted by `parent_offsets`: cells under the same parent are contiguous.
 
 ### `parent_offsets`
 
@@ -116,11 +116,51 @@ Each element is the HEALPix NESTED cell index at resolution `nside`. Values are 
 | Encoding | little-endian bytes + zstd compression |
 | Fill value | `0` |
 
-CSR-style index array. For parent cell `p`, the data cells belonging to it occupy rows `parent_offsets[p] : parent_offsets[p+1]` in `cell_id` and every `bands/<name>` array. An empty parent cell has `parent_offsets[p] == parent_offsets[p+1]`.
+CSR-style index. For parent cell `p`, data rows are `parent_offsets[p] : parent_offsets[p+1]` in `cell_id` and in each `bands/<name>` array. An empty parent has `parent_offsets[p] == parent_offsets[p+1]`.
+
+#### Chunking `parent_offsets`
+
+`parent_offsets` is dense over the full parent grid: length `12 * nside_parent² + 1`. At coarse levels that is small; at fine levels it can be millions of entries (tens of megabytes uncompressed). The tile layer only needs two values per visible tile: `parent_offsets[p]` and `parent_offsets[p+1]`, to get the row range for parent `p`.
+
+Over HTTP, Zarr v3 reads by chunk. The byte range comes from the chunk that contains the sliced indices, not from how narrow the slice is:
+
+- One chunk for the whole array means every tile load pulls the full CSR index. Pan and zoom will re-download it.
+- Chunks that are too large (e.g. 1M entries, about 8 MB for `uint64`) still mean a request for `p` and `p+1` downloads the whole chunk covering `p`, not just the 16 bytes you need.
+
+Chunk `parent_offsets` along its only dimension into moderately sized pieces. **4096** entries (32 KB for `uint64`) is a reasonable default: a `slice(p, p+1)` read touches at most one chunk, and metadata overhead stays low.
+
+Chunk `cell_id` and `bands/<name>` on the row dimension as well.
+
+#### Reader load sequence
+
+For each visible parent cell `p` at a level, conformant readers follow three steps (see `loadTileFromGroup` in `@developmentseed/deck.gl-healpix-zarr`):
+
+1. **Row range lookup** — read two consecutive CSR entries:
+
+   ```
+   zarr.get(parent_offsets, [slice(p, p + 2)])
+   ```
+
+   Over HTTP this is a range read on the chunk(s) for indices `p` and `p+1`. With 4096-entry chunks, that is at most one chunk (~32 KB). Set `rowStart = offsets[0]`, `rowEnd = offsets[1]`. If `rowStart >= rowEnd`, the parent tile is empty; stop.
+
+2. **Cell IDs** — sparse rows for that parent:
+
+   ```
+   zarr.get(cell_id, [slice(rowStart, rowEnd)])
+   ```
+
+3. **Band values** — same row slice on each requested band:
+
+   ```
+   zarr.get(bands/<name>, [slice(rowStart, rowEnd)])   # for each selected band
+   ```
+
+Steps 2 and 3 can run in parallel after the range is known. Because `cell_id` and band arrays are sorted by parent, all rows for parent `p` are contiguous. Each step is one contiguous slice (it may span several row chunks, but not the full `npix` array).
+
 
 ### `bands/<band_name>`
 
-One array per entry in `root.attrs.bands`. The name must exactly match the corresponding entry in the `bands` list.
+One array per name in `root.attrs.bands`. The directory name must match the entry in the `bands` list.
 
 | Property | Value |
 |----------|-------|
@@ -129,26 +169,26 @@ One array per entry in `root.attrs.bands`. The name must exactly match the corre
 | Encoding | little-endian bytes + zstd compression |
 | Fill value | `0.0` |
 
-The i-th element corresponds to the i-th element of `cell_id`. All band arrays within a level have the same length (`npix`).
+Element `i` matches element `i` of `cell_id`. Every band array at a level has length `npix`.
 
 ---
 
 ## Single-variable stores
 
-A store with a single variable is valid and identical in layout to a multi-band store. The root `bands` attribute contains exactly one name (the name is arbitrary but should be descriptive):
+A one-band store uses the same layout as a multi-band store. Root `bands` has one name (your choice, but make it descriptive):
 
 ```json
 { "bands": ["elevation"] }
 ```
 
-The store then contains `bands/elevation` at every level, and callers receive `meta.bands === ["elevation"]` from `onMetadata`.
+Every level then has `bands/elevation`, and `onMetadata` reports `meta.bands === ["elevation"]`.
 
 ---
 
 ## Naming conventions
 
-- **Band names** should be lowercase ASCII, using underscores for spaces. No slashes or dots. Examples: `b01`, `b8a`, `elevation`, `ndvi`, `red`.
-- **Level directory names** are `nside_<N>` where `<N>` is the decimal integer nside value with no zero-padding.
+- Band names: lowercase ASCII, underscores for spaces. No slashes or dots. Examples: `b01`, `b8a`, `elevation`, `ndvi`, `red`.
+- Level directories: `nside_<N>` where `<N>` is the decimal nside with no zero-padding.
 
 ---
 
@@ -156,8 +196,9 @@ The store then contains `bands/elevation` at every level, and callers receive `m
 
 A store is conformant if:
 
-1. Root `zarr.json` contains all required attributes with the correct types.
+1. Root `zarr.json` has all required attributes with the correct types.
 2. A group `nside_<N>` exists for every power-of-two N in `[min_nside, base_nside]`.
-3. Each level group contains `cell_id`, `parent_offsets`, and `bands/<name>` for every name in root `bands`, with the shapes and dtypes specified above.
-4. `parent_offsets` length equals `12 * nside_parent^2 + 1`.
-5. All `bands/<name>` arrays at a level have the same length as `cell_id`.
+3. Each level has `cell_id`, `parent_offsets`, and `bands/<name>` for every name in root `bands`, with the shapes and dtypes above.
+4. `parent_offsets` length is `12 * nside_parent^2 + 1`.
+5. All `bands/<name>` arrays at a level match `cell_id` length.
+6. `parent_offsets` is chunked on its sole dimension. A single chunk is only acceptable when the array is smaller than one chunk.
