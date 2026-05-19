@@ -1,0 +1,23 @@
+[project]
+name = "sentinel2-zhealpix"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "dask[distributed]>=2024.1",
+    "zarr>=3",
+    "healpy>=1.16",
+    "pyproj>=3.6",
+    "numpy>=1.26",
+    "requests>=2.33.1",
+    "aiohttp>=3.13.5",
+    "bokeh>=3.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

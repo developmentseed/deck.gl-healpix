@@ -38,3 +38,8 @@ yarn-error.log*
 test/gpu/shader-chunks.gen.mjs
 
 docs/superpowers/plans
+
+# Python
+.pytest_cache
+.venv
+__pycache__
