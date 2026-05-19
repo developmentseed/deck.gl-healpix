@@ -34,7 +34,10 @@ import { COMPOSITES, type CompositeKey } from './sentinel-zarr-bands';
 import { NDVI_MODULE, RGB_COMPOSITE_MODULE } from './bands-modules';
 import { useParentOutline } from './parent-outline-hook';
 
-const ZARR_URL = `http://localhost:8888/pyramid.zarr`;
+const base =
+  import.meta.env.VITE_STATIC_FILES_URL ||
+  'http://healpix-data.s3-website-us-east-1.amazonaws.com';
+const ZARR_URL = `${base}/lisbon-multiscale.zarr`;
 
 const VIS_OPTIONS = Object.entries(COMPOSITES).map(([k, v]) => ({
   value: k as CompositeKey,

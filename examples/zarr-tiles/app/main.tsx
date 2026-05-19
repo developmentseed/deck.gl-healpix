@@ -13,7 +13,7 @@ function Root() {
 
   return (
     <PageLayout
-      title='HEALPix Sandbox'
+      title={import.meta.env.VITE_APP_TITLE}
       navItems={[{ label: 'Zarr Tiles', to: '/' }]}
     >
       <Routes>
