@@ -19,6 +19,7 @@ import {
 } from './zarr-pyramid';
 import type { ZarrPyramidMetadata } from './zarr-pyramid';
 import type { CachedZarrStore } from './cached-zarr-store';
+import { createTileDebugLayers } from './tile-debug-layers';
 import type { HealpixTileIndex, HealpixZarrTileData } from './types';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -80,6 +81,11 @@ type _HealpixZarrTileLayerProps = {
    * Stable function reference recommended (useCallback / useState setter).
    */
   onStats?: (stats: HealpixZarrLayerStats) => void;
+  /**
+   * When true, draws a border and tile id label (`z-y-x`) on each loaded tile.
+   * Useful for debugging tile loading and partition boundaries.
+   */
+  debugTiles?: boolean;
 };
 
 export type HealpixZarrTileLayerProps = _HealpixZarrTileLayerProps &
@@ -100,6 +106,7 @@ const defaultProps = {
   shaderModules: { type: 'object', value: [], compare: false },
   onMetadata: { type: 'function', value: undefined, compare: false },
   onStats: { type: 'function', value: undefined, compare: false },
+  debugTiles: { type: 'boolean', value: false },
   // Override TileLayer's default Tileset2D with our HEALPix-aware subclass.
   TilesetClass: HealpixTileset2D
 } as unknown as DefaultProps<_HealpixZarrTileLayerProps>;
@@ -231,7 +238,7 @@ export class HealpixZarrTileLayer extends TileLayer<
     const { data, tile } = props;
     if (!data || data.cellIds.length === 0) return null;
 
-    return new HealpixCellsLayer({
+    const cellsLayer = new HealpixCellsLayer({
       ...this.getSubLayerProps({ id: `tile-${tile.id}` }),
       nside: data.nside,
       cellIds: data.cellIds,
@@ -245,5 +252,21 @@ export class HealpixZarrTileLayer extends TileLayer<
       filterMax: this.props.filterMax,
       shaderModules: this.props.shaderModules
     });
+
+    if (!this.props.debugTiles) {
+      return cellsLayer;
+    }
+
+    const index = tile.index as HealpixTileIndex;
+    const partitionNside = this.state.tileset!.partitionNside(data.nside);
+    const debugLayers = createTileDebugLayers({
+      id: tile.id,
+      parentCell: index.x,
+      partitionNside,
+      tileId: tile.id,
+      getSubLayerProps: (extra) => this.getSubLayerProps(extra)
+    });
+
+    return [cellsLayer, ...debugLayers];
   }
 }

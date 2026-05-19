@@ -4,6 +4,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import {
   Box,
   Checkbox,
+  Code,
   Field,
   Flex,
   NativeSelect,
@@ -60,6 +61,7 @@ export default function PageZarrTiles() {
   const [rescaleMax, setRescaleMax] = useState(0.6);
   const [colorScheme, setColorScheme] =
     useState<ColorSchemeName>('interpolateViridis');
+  const [debugTiles, setDebugTiles] = useState(false);
   const [layerStats, setLayerStats] = useState<HealpixZarrLayerStats>({
     nside: 0,
     nsideParent: 0,
@@ -102,9 +104,18 @@ export default function PageZarrTiles() {
         colorMode: isNdvi ? HEALPIX_COLOR_MODE_SCALAR : HEALPIX_COLOR_MODE_RGB,
         shaderModules,
         onStats: setLayerStats,
+        debugTiles,
         ...(isNdvi && { colorMap, rescaleMin, rescaleMax })
       }),
-    [selectedBands, isNdvi, shaderModules, colorMap, rescaleMin, rescaleMax]
+    [
+      selectedBands,
+      isNdvi,
+      shaderModules,
+      colorMap,
+      rescaleMin,
+      rescaleMax,
+      debugTiles
+    ]
   );
 
   const {
@@ -228,7 +239,22 @@ export default function PageZarrTiles() {
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label fontSize='sm'>
-            Show parent tile outlines
+            Show viewport tile outlines
+          </Checkbox.Label>
+        </Checkbox.Root>
+
+        <Checkbox.Root
+          checked={debugTiles}
+          onCheckedChange={(e) => setDebugTiles(!!e.checked)}
+          size='sm'
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+          <Checkbox.Label fontSize='sm'>
+            Show tile ids and borders <br />
+            <Text as='span' fontSize='xs'>
+              Format: <Code>data_order-parent_order-parent_index</Code>
+            </Text>
           </Checkbox.Label>
         </Checkbox.Root>
 
@@ -277,7 +303,7 @@ export default function PageZarrTiles() {
           mapStyle={`https://api.maptiler.com/maps/aquarelle-v4/style.json?key=${import.meta.env.VITE_MAPTILER_KEY}`}
           style={{ width: '100%', height: '100%' }}
         >
-          <DeckGlOverlay layers={[layer, ...parentOutlineLayers]} />
+          <DeckGlOverlay layers={[...parentOutlineLayers, layer]} />
         </Map>
       </Box>
     </Flex>

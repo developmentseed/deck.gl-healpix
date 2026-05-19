@@ -9,7 +9,7 @@ A deck.gl layer for rendering HEALPix data from a [HEALPix Pyramid Zarr](../../d
 **Layer behavior:**
 
 - Root `parent_levels` is read from the store and passed to `HealpixTileset2D`.
-- Tile index `{ x, y, z }`: `x` = parent cell at `nside_parent` (NESTED); `y` = 0; `z` = `log2(nside)` for the data level opened as `nside_<N>/`.
+- Tile index `{ x, y, z }`: `x` = parent cell at `nside_parent` (NESTED); `y` = `log2(nside_parent)`; `z` = `log2(nside)` for the data level opened as `nside_<N>/`. Tile ids are `z-y-x`.
 - Selected `bands` are loaded from `bands/<name>` and interleaved per pixel as `[b0_p0, b1_p0, …, b0_p1, …]` in prop order.
 
 ## Installation
@@ -54,6 +54,7 @@ const layer = new HealpixZarrTileLayer({
 | `shaderModules` | `ShaderModule[]` | `[]` | Per-tile shader modules |
 | `onMetadata` | `function` | — | `(meta: ZarrPyramidMetadata, root) => void` when root metadata loads |
 | `onStats` | `function` | — | Tile/cell render counts after each update |
+| `debugTiles` | `boolean` | `false` | Yellow border and `z-y-x` tile id label on each loaded tile |
 
 `onMetadata` receives `ZarrPyramidMetadata` (`bands`, `nsides`, `baseNside`, `minNside`, `parentLevels`) derived from root attributes in the spec.
 

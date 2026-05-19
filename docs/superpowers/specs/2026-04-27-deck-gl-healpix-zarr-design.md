@@ -124,7 +124,7 @@ viewport change
   → HealpixTileset2D.getTileIndices(viewport)
       zoom + zoomOffset → nside
       queryBoxInclusiveNest(nsideParent, bounds) → parent cells
-      → [{x: parentCell, y:0, z: log2(nside)}, ...]
+      → [{x: parentCell, y: log2(nsideParent), z: log2(nside)}, ...]
 
   → Tileset2D schedules getTileData for new tiles
     (handles concurrency, AbortSignal, LRU eviction)
@@ -150,7 +150,7 @@ Subclass of `Tileset2D` (`@deck.gl/geo-layers`).
 ```typescript
 interface HealpixTileIndex {
   x: number;  // parent cell (NESTED) at nside_parent
-  y: 0;       // unused
+  y: number;  // log2(nside_parent) — partition order, not a spatial axis
   z: number;  // log2(nside) — the data nside, not deck.gl zoom
 }
 ```
@@ -159,11 +159,11 @@ interface HealpixTileIndex {
 
 | Method | Implementation |
 |---|---|
-| `getTileIndices(viewport)` | zoom → nside → nsideParent → `queryBoxInclusiveNest` → `[{x, y:0, z}]`; returns `[]` until metadata loaded |
-| `getTileId({x, z})` | `"${z}-${x}"` |
+| `getTileIndices(viewport)` | zoom → nside → nsideParent → `queryBoxInclusiveNest` → `[{x, y: log2(nsideParent), z}]`; returns `[]` until metadata loaded |
+| `getTileId({x, y, z})` | `"${z}-${y}-${x}"` |
 | `getTileZoom({z})` | `z` |
 | `getTileMetadata({x, z})` | `{ bbox: cornersNestLonLat(2^z, x), nside: 2^z }` |
-| `getParentIndex({x, z})` | `{ x: Math.floor(x / 4), y: 0, z: z - 1 }` |
+| `getParentIndex({x, y, z})` | `{ x: Math.floor(x / 4), y: log2(partitionNside(2^(z-1))), z: z - 1 }` |
 
 `getParentIndex` uses NESTED semantics: the parent of cell `C` at nside `N` is `floor(C / 4)` at nside `N/2`. Used by the `best-available` refinement strategy to find a cached coarser tile as a placeholder while finer tiles load.
 

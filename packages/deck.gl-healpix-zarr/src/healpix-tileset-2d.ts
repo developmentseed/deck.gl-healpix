@@ -43,8 +43,8 @@ export type HealpixTileset2DOptions = Omit<Tileset2DProps, 'getTileData'> &
  *         parent cell numbers: loading tile (z, x) means slicing
  *         `bands/<name>[parent_offsets[x] : parent_offsets[x+1]]`.
  *
- *   y  — Always 0. HEALPix cell indices are 1-D; there is no second spatial
- *         axis. deck.gl's TileLayer requires a `y` field so it is fixed at 0.
+ *   y  — HEALPix *order* of the partition nside: `partition_nside = 2^y`.
+ *         Not used for spatial indexing; carried in tile ids and parent lookup.
  */
 export class HealpixTileset2D extends Tileset2D {
   private _availableNsides: number[];
@@ -117,13 +117,14 @@ export class HealpixTileset2D extends Tileset2D {
     const nside = this.nsideForZoom(viewport.zoom);
     const z = nside2order(nside);
     const nsideParent = this.partitionNside(nside);
+    const y = nside2order(nsideParent);
     const bbox = viewport.getBounds();
     const cells = queryBoxInclusiveNest(nsideParent, bbox);
-    return cells.map((x) => ({ x, y: 0, z }));
+    return cells.map((x) => ({ x, y, z }));
   }
 
   override getTileId(index: HealpixTileIndex): string {
-    return `${index.z}-${index.x}`;
+    return `${index.z}-${index.y}-${index.x}`;
   }
 
   override getTileZoom(index: HealpixTileIndex): number {
@@ -131,6 +132,8 @@ export class HealpixTileset2D extends Tileset2D {
   }
 
   override getParentIndex(index: HealpixTileIndex): HealpixTileIndex {
-    return { x: Math.floor(index.x / 4), y: 0, z: index.z - 1 };
+    const z = index.z - 1;
+    const y = nside2order(this.partitionNside(1 << z));
+    return { x: Math.floor(index.x / 4), y, z };
   }
 }

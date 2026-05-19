@@ -12,9 +12,9 @@ function makeViewport(zoom: number, bounds: [number, number, number, number]) {
 const GLOBAL_BOUNDS: [number, number, number, number] = [-180, -90, 180, 90];
 
 describe('HealpixTileset2D.getTileId', () => {
-  it('returns z-x string for a HealpixTileIndex', () => {
+  it('returns z-y-x string for a HealpixTileIndex', () => {
     const ts = new HealpixTileset2D({ availableNsides: [4] });
-    expect(ts.getTileId({ x: 7, y: 0, z: 2 })).toBe('2-7');
+    expect(ts.getTileId({ x: 7, y: 0, z: 2 })).toBe('2-0-7');
   });
 });
 
@@ -44,6 +44,18 @@ describe('HealpixTileset2D.getParentIndex', () => {
     });
   });
 
+  it('decrements y when parentLevels=0 and partition nside halves', () => {
+    const ts = new HealpixTileset2D({
+      availableNsides: [16],
+      parentLevels: 0
+    });
+    expect(ts.getParentIndex({ x: 8, y: 4, z: 4 })).toEqual({
+      x: 2,
+      y: 3,
+      z: 3
+    });
+  });
+
   it('is safe for large cell indices beyond 2^31', () => {
     const ts = new HealpixTileset2D({ availableNsides: [4] });
     const largeX = 2 ** 32 + 8;
@@ -64,7 +76,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     expect(Array.isArray(indices)).toBe(true);
     for (const idx of indices) {
       expect(typeof idx.x).toBe('number');
-      expect(idx.y).toBe(0);
+      expect(idx.y).toBe(idx.z);
       expect(typeof idx.z).toBe('number');
     }
   });

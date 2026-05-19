@@ -15,14 +15,13 @@
  * `bands/<name>[parent_offsets[x] : parent_offsets[x+1]]`, so x is the direct key
  * into that index.
  *
- * **y** — Always 0. HEALPix cell indices are 1-D; there is no second spatial
- * axis. deck.gl's TileLayer requires a `y` field so it is fixed at 0.
+ * **y** — This value is not used but it stores the HEALPix order of the parent nside.
  */
 export interface HealpixTileIndex {
   /** Parent cell at partition_nside in NESTED ordering — the tile key. */
   x: number;
-  /** Unused spatial axis — always 0. */
-  y: 0;
+  /** HEALPix order: parent_nside = 2^y. Not used, just a useful placeholder. */
+  y: number;
   /** HEALPix order: data_nside = 2^z. */
   z: number;
 }
