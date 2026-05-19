@@ -1,4 +1,8 @@
-import { clampToAvailable, getNsideForZoom, rowRangeFromOffsetPair } from './utils.js';
+import {
+  clampToAvailable,
+  getNsideForZoom,
+  rowRangeFromOffsetPair
+} from './utils.js';
 
 describe('clampToAvailable', () => {
   const available = [1, 4, 16, 64, 256];
@@ -55,11 +59,17 @@ describe('getNsideForZoom', () => {
 
 describe('rowRangeFromOffsetPair', () => {
   it('returns rowStart and rowEnd for a valid pair of numbers', () => {
-    expect(rowRangeFromOffsetPair([10, 20])).toEqual({ rowStart: 10, rowEnd: 20 });
+    expect(rowRangeFromOffsetPair([10, 20])).toEqual({
+      rowStart: 10,
+      rowEnd: 20
+    });
   });
 
   it('returns rowStart and rowEnd for a valid pair of bigints', () => {
-    expect(rowRangeFromOffsetPair([10n, 20n])).toEqual({ rowStart: 10, rowEnd: 20 });
+    expect(rowRangeFromOffsetPair([10n, 20n])).toEqual({
+      rowStart: 10,
+      rowEnd: 20
+    });
   });
 
   it('returns null when rowStart >= rowEnd (empty tile)', () => {

@@ -1,5 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
+import { pix2LonLatNest } from 'healpix-ts';
 import { HealpixTileset2D } from './healpix-tileset-2d.js';
+import { lonLatDistanceSq } from './sort-by-distance.js';
 
 // Minimal Viewport mock — provides only what HealpixTileset2D.getTileIndices needs.
 function makeViewport(zoom: number, bounds: [number, number, number, number]) {
@@ -188,6 +190,65 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     const viewport = makeViewport(8, GLOBAL_BOUNDS);
     const indices = ts.getTileIndices({ viewport } as any);
     expect(indices.every((i) => i.z === 8)).toBe(true); // log2(256)=8
+  });
+
+  it('sorts tiles by increasing distance from viewport center', () => {
+    const ts = new HealpixTileset2D({
+      availableNsides: [4],
+      zoomOffset: 0,
+      parentLevels: 0
+    });
+    const centerLon = -74;
+    const centerLat = 40.7;
+    const bbox: [number, number, number, number] = [
+      centerLon - 0.2,
+      centerLat - 0.15,
+      centerLon + 0.2,
+      centerLat + 0.15
+    ];
+    const viewport = {
+      zoom: 2,
+      longitude: centerLon,
+      latitude: centerLat,
+      getBounds: () => bbox
+    };
+    const indices = ts.getTileIndices({ viewport } as any);
+    expect(indices.length).toBeGreaterThan(1);
+
+    const partitionNside = 4;
+    let prevDist = -1;
+    for (const { x } of indices) {
+      const [lon, lat] = pix2LonLatNest(partitionNside, x);
+      const dist = lonLatDistanceSq(lon, lat, centerLon, centerLat);
+      expect(dist).toBeGreaterThanOrEqual(prevDist);
+      prevDist = dist;
+    }
+  });
+
+  it('sorting does not change which tiles are selected', () => {
+    const ts = new HealpixTileset2D({
+      availableNsides: [4],
+      zoomOffset: 0,
+      parentLevels: 0
+    });
+    const bbox: [number, number, number, number] = [-10, 40, 10, 55];
+    const viewportA = { zoom: 2, getBounds: () => bbox };
+    const viewportB = {
+      zoom: 2,
+      longitude: 0,
+      latitude: 47.5,
+      getBounds: () => bbox
+    };
+    const idsA = ts
+      .getTileIndices({ viewport: viewportA } as any)
+      .map((i) => `${i.z}-${i.y}-${i.x}`)
+      .sort();
+    const idsB = ts
+      .getTileIndices({ viewport: viewportB } as any)
+      .map((i) => `${i.z}-${i.y}-${i.x}`)
+      .sort();
+    expect(idsB).toEqual(idsA);
+    expect(idsA.length).toBeGreaterThan(1);
   });
 
   it('uses zoomOffset to shift data nside selection', () => {

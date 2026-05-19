@@ -3,8 +3,9 @@ import {
   type _Tileset2DProps as Tileset2DProps
 } from '@deck.gl/geo-layers';
 import { queryBoxInclusiveNest, nside2order } from 'healpix-ts';
-import { getNsideForZoom } from './utils';
+import { sortTileIndicesByViewportCenter } from './sort-by-distance';
 import type { HealpixTileIndex } from './types';
+import { getNsideForZoom } from './utils';
 
 // Extra fields accepted by setOptions (and optionally by the constructor).
 type HealpixExtras = {
@@ -120,7 +121,8 @@ export class HealpixTileset2D extends Tileset2D {
     const y = nside2order(nsideParent);
     const bbox = viewport.getBounds();
     const cells = queryBoxInclusiveNest(nsideParent, bbox);
-    return cells.map((x) => ({ x, y, z }));
+    const indices = cells.map((x) => ({ x, y, z }));
+    return sortTileIndicesByViewportCenter(indices, nsideParent, viewport);
   }
 
   override getTileId(index: HealpixTileIndex): string {
