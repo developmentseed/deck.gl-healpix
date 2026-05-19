@@ -16,6 +16,7 @@ const alias = Object.entries(pkg.alias).reduce((acc, [key, value]) => {
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: process.env.VITE_BASE_URL || '/',
   plugins: [react()],
   // ES workers: IIFE is invalid when the worker graph is code-split (e.g. zarr).
   worker: { format: 'es' },

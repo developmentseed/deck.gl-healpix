@@ -35,8 +35,7 @@ import { NDVI_MODULE, RGB_COMPOSITE_MODULE } from './bands-modules';
 import { useParentOutline } from './parent-outline-hook';
 
 const base =
-  import.meta.env.VITE_STATIC_FILES_URL ||
-  'http://healpix-data.s3-website-us-east-1.amazonaws.com';
+  import.meta.env.VITE_STATIC_FILES_URL || 'https://healpix-data.ds.io';
 const ZARR_URL = `${base}/lisbon-multiscale.zarr`;
 
 const VIS_OPTIONS = Object.entries(COMPOSITES).map(([k, v]) => ({
