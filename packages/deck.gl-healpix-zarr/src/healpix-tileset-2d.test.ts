@@ -1,10 +1,15 @@
 import { describe, it, expect } from '@jest/globals';
 import { pix2LonLatNest } from 'healpix-ts';
-import { HealpixTileset2D } from './healpix-tileset-2d.js';
-import { lonLatDistanceSq } from './sort-by-distance.js';
+import { HealpixTileset2D } from './healpix-tileset-2d';
+import { lonLatDistanceSq } from './sort-by-distance';
+
+type GetTileIndicesArgs = Parameters<HealpixTileset2D['getTileIndices']>[0];
 
 // Minimal Viewport mock — provides only what HealpixTileset2D.getTileIndices needs.
-function makeViewport(zoom: number, bounds: [number, number, number, number]) {
+function makeViewport(
+  zoom: number,
+  bounds: [number, number, number, number]
+): GetTileIndicesArgs['viewport'] {
   return {
     zoom,
     getBounds: () => bounds
@@ -74,7 +79,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(Array.isArray(indices)).toBe(true);
     for (const idx of indices) {
       expect(typeof idx.x).toBe('number');
@@ -91,7 +96,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.length).toBe(192);
   });
 
@@ -104,7 +109,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 2
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.length).toBe(12);
   });
 
@@ -116,7 +121,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 1
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.length).toBe(48);
   });
 
@@ -128,7 +133,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 6
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.length).toBe(12);
   });
 
@@ -140,14 +145,14 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 6
     });
     const viewport = makeViewport(8, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.length).toBe(192);
   });
 
   it('returns empty array when availableNsides is empty', () => {
     const ts = new HealpixTileset2D({ availableNsides: [] });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices).toHaveLength(0);
   });
 
@@ -159,11 +164,11 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    expect(ts.getTileIndices({ viewport } as any)).toHaveLength(0);
+    expect(ts.getTileIndices({ viewport })).toHaveLength(0);
 
-    ts.setOptions({ availableNsides: [4] } as any);
+    ts.setOptions({ availableNsides: [4] });
     // nside=4, parentLevels=0 => nsideParent=4 => 12*16=192 tiles globally
-    expect(ts.getTileIndices({ viewport } as any)).toHaveLength(192);
+    expect(ts.getTileIndices({ viewport })).toHaveLength(192);
   });
 
   it('reflects updated parentLevels after setOptions', () => {
@@ -173,11 +178,11 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
-    expect(ts.getTileIndices({ viewport } as any)).toHaveLength(192); // parentLevels=0 => 192 tiles
+    expect(ts.getTileIndices({ viewport })).toHaveLength(192); // parentLevels=0 => 192 tiles
 
-    ts.setOptions({ parentLevels: 2 } as any);
+    ts.setOptions({ parentLevels: 2 });
     // parentLevels=2 => nsideParent = 4>>2 = 1 => 12 tiles
-    expect(ts.getTileIndices({ viewport } as any)).toHaveLength(12);
+    expect(ts.getTileIndices({ viewport })).toHaveLength(12);
   });
 
   it('z value in returned indices equals log2(data nside), not log2(nsideParent)', () => {
@@ -188,7 +193,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 6
     });
     const viewport = makeViewport(8, GLOBAL_BOUNDS);
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.every((i) => i.z === 8)).toBe(true); // log2(256)=8
   });
 
@@ -212,7 +217,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       latitude: centerLat,
       getBounds: () => bbox
     };
-    const indices = ts.getTileIndices({ viewport } as any);
+    const indices = ts.getTileIndices({ viewport });
     expect(indices.length).toBeGreaterThan(1);
 
     const partitionNside = 4;
@@ -240,11 +245,11 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       getBounds: () => bbox
     };
     const idsA = ts
-      .getTileIndices({ viewport: viewportA } as any)
+      .getTileIndices({ viewport: viewportA })
       .map((i) => `${i.z}-${i.y}-${i.x}`)
       .sort();
     const idsB = ts
-      .getTileIndices({ viewport: viewportB } as any)
+      .getTileIndices({ viewport: viewportB })
       .map((i) => `${i.z}-${i.y}-${i.x}`)
       .sort();
     expect(idsB).toEqual(idsA);
@@ -264,8 +269,8 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
       parentLevels: 0
     });
     const viewport = makeViewport(0, GLOBAL_BOUNDS);
-    const i4 = ts4.getTileIndices({ viewport } as any);
-    const i16 = ts16.getTileIndices({ viewport } as any);
+    const i4 = ts4.getTileIndices({ viewport });
+    const i16 = ts16.getTileIndices({ viewport });
     // nside=16 has (16/4)^2 = 16x more cells than nside=4
     expect(i16.length).toBe(i4.length * 16);
   });

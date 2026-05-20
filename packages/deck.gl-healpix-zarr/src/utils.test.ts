@@ -2,7 +2,7 @@ import {
   clampToAvailable,
   getNsideForZoom,
   rowRangeFromOffsetPair
-} from './utils.js';
+} from './utils';
 
 describe('clampToAvailable', () => {
   const available = [1, 4, 16, 64, 256];

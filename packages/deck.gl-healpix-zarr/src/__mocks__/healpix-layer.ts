@@ -2,5 +2,5 @@
 export class HealpixCellsLayer {
   static layerName = 'HealpixCellsLayer';
   static defaultProps = {};
-  constructor(public props: any = {}) {}
+  constructor(public props: Record<string, unknown> = {}) {}
 }

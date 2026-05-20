@@ -31,9 +31,7 @@ import { HEALPIX_COLOR_MODE_RGB } from '@developmentseed/deck.gl-healpix';
 
 const layer = new HealpixZarrTileLayer({
   url: 'https://example.com/sentinel2-pyramid.zarr',
-  bands: ['b04', 'b03', 'b02'],
-  zoomOffset: 5,
-  colorMode: HEALPIX_COLOR_MODE_RGB,
+  bands: ['b04', 'b03', 'b02'],  colorMode: HEALPIX_COLOR_MODE_RGB,
   onMetadata: (meta: ZarrPyramidMetadata) => {
     console.log(meta.bands, meta.nsides);
   },
@@ -46,7 +44,7 @@ const layer = new HealpixZarrTileLayer({
 |------|------|---------|-------------|
 | `url` | `string` | `''` | URL of a store conforming to the [data spec](../../docs/specs/healpix-pyramid-zarr.md) |
 | `bands` | `string[] \| null` | `null` | Bands to load; `null` loads nothing. Order sets interleaved value columns. |
-| `zoomOffset` | `number` | (TileLayer) | `nside = 2^round(zoom + zoomOffset)` |
+| `zoomOffset` | `number` | (TileLayer) | `nside = 2^round(zoom + zoomOffset)`. **Advanced:** shifts the zoom-to-nside mapping; rarely needs adjustment. Changing the default causes a lot more data to be loaded. |
 | `colorMode` | `number` | RGB | Forwarded to `HealpixCellsLayer` |
 | `colorMap` | `Uint8Array` | — | 256×4 RGBA LUT for scalar modes |
 | `rescaleMin` / `rescaleMax` | `number` | — | Scalar range → colorMap indices 0 and 255 |

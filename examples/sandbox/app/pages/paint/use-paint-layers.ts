@@ -9,11 +9,7 @@ import type { MapRef } from 'react-map-gl/maplibre';
 
 import { bboxToPath } from './bbox';
 import { coloredCellIds, type ColoredCell } from './colored-cells';
-import {
-  hexToRgb,
-  PAINT_COLOR_MAP,
-  PAINT_COLORS
-} from './colors';
+import { hexToRgb, PAINT_COLOR_MAP, PAINT_COLORS } from './colors';
 import { cellCorners, cellToLonLat } from './healpix-geo';
 import { filterCellsWithVisibleLabels, LABEL_FONT_SIZE } from './label-fit';
 import type { HealpixScheme, PaintViewState } from './types';

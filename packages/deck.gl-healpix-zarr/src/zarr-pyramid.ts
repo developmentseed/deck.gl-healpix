@@ -1,7 +1,7 @@
 import * as zarr from 'zarrita';
-import { CachedZarrStore } from './cached-zarr-store.js';
-import { rowRangeFromOffsetPair } from './utils.js';
-import type { HealpixZarrTileData } from './types.js';
+import { CachedZarrStore } from './cached-zarr-store';
+import { rowRangeFromOffsetPair } from './utils';
+import type { HealpixZarrTileData } from './types';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Public types
@@ -24,12 +24,6 @@ export interface GroupHandle {
   bandArrs: Map<string, zarr.Array<zarr.DataType, CachedZarrStore>>;
   allBands: string[];
 }
-
-/** Injectable zarr.get signature — default is zarr.get; overridden in tests. */
-export type ZarrGetter = (
-  arr: zarr.Array<zarr.DataType, any>,
-  selector: unknown
-) => Promise<{ data: ArrayLike<number | bigint> }>;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Caches — shared across all layer instances pointing to the same URL
@@ -119,6 +113,35 @@ export function getGroupHandle(
 // Tile loader
 // ──────────────────────────────────────────────────────────────────────────────
 
+export function assembleTileData(
+  nside: number,
+  parentOffsets: ArrayLike<bigint | number>,
+  rawCellIds: ArrayLike<number | bigint>,
+  bandSlices: ArrayLike<number>[],
+  selectedBands: string[]
+): HealpixZarrTileData | null {
+  const range = rowRangeFromOffsetPair(parentOffsets);
+  if (!range) return null;
+
+  const cellIds = new Float64Array(rawCellIds.length);
+  for (let i = 0; i < rawCellIds.length; i++) {
+    cellIds[i] = Number(rawCellIds[i]);
+  }
+  if (cellIds.length === 0) return null;
+
+  const npix = cellIds.length;
+  const nb = selectedBands.length;
+  const values = new Float32Array(npix * nb);
+  for (let b = 0; b < nb; b++) {
+    const src = bandSlices[b];
+    for (let p = 0; p < npix; p++) {
+      values[p * nb + b] = Number(src[p]);
+    }
+  }
+
+  return { nside, cellIds, values, bands: selectedBands };
+}
+
 export async function loadTileFromGroup(
   group: GroupHandle,
   parentCell: number,
@@ -139,7 +162,6 @@ export async function loadTileFromGroup(
   if (signal?.aborted) return null;
 
   const { rowStart, rowEnd } = range;
-  const npix = rowEnd - rowStart;
 
   const [idsResult, ...bandResults] = await Promise.all([
     zarr.get(group.cellIdArr, [zarr.slice(rowStart, rowEnd)]),
@@ -150,21 +172,11 @@ export async function loadTileFromGroup(
 
   if (signal?.aborted) return null;
 
-  const rawIds = idsResult.data as ArrayLike<number | bigint>;
-  const cellIds = new Float64Array(rawIds.length);
-  for (let i = 0; i < rawIds.length; i++) cellIds[i] = Number(rawIds[i]);
-
-  if (cellIds.length === 0) return null;
-
-  // Interleave: [b0_p0, b1_p0, …, bN_p0, b0_p1, …]
-  const nb = selectedBands.length;
-  const values = new Float32Array(npix * nb);
-  for (let b = 0; b < nb; b++) {
-    const src = bandResults[b].data as ArrayLike<number>;
-    for (let p = 0; p < npix; p++) {
-      values[p * nb + b] = Number(src[p]);
-    }
-  }
-
-  return { nside: group.nside, cellIds, values, bands: selectedBands };
+  return assembleTileData(
+    group.nside,
+    poResult.data as ArrayLike<bigint | number>,
+    idsResult.data as ArrayLike<number | bigint>,
+    bandResults.map((r) => r.data as ArrayLike<number>),
+    selectedBands
+  );
 }

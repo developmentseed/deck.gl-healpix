@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { CachedZarrStore, type FetchStoreLike } from './cached-zarr-store.js';
+import { CachedZarrStore, type FetchStoreLike } from './cached-zarr-store';
 
 type AbsolutePath = `/${string}`;
 
 const BYTES = new Uint8Array([1, 2, 3]);
 
 function makeBaseStore(
-  getImpl: (key: AbsolutePath) => Promise<Uint8Array | undefined> = () => Promise.resolve(BYTES),
-  getRangeImpl: () => Promise<Uint8Array | undefined> = () => Promise.resolve(BYTES)
+  getImpl: (key: AbsolutePath) => Promise<Uint8Array | undefined> = () =>
+    Promise.resolve(BYTES),
+  getRangeImpl: () => Promise<Uint8Array | undefined> = () =>
+    Promise.resolve(BYTES)
 ): FetchStoreLike & { getCalls: AbsolutePath[]; getRangeCalls: number } {
   const getCalls: AbsolutePath[] = [];
   let getRangeCalls = 0;
@@ -23,7 +25,7 @@ function makeBaseStore(
     async getRange(_key: AbsolutePath, _range: unknown) {
       getRangeCalls++;
       return getRangeImpl();
-    },
+    }
   };
 }
 
@@ -31,7 +33,10 @@ function makeStore(
   base: FetchStoreLike,
   opts: { maxCacheEntries?: number } = {}
 ): CachedZarrStore {
-  return new CachedZarrStore('http://example.com', { _baseStore: base, ...opts });
+  return new CachedZarrStore('http://example.com', {
+    _baseStore: base,
+    ...opts
+  });
 }
 
 describe('CachedZarrStore.get', () => {
@@ -59,7 +64,9 @@ describe('CachedZarrStore.get', () => {
 
   it('deduplicates concurrent requests for the same key', async () => {
     let resolve!: (v: Uint8Array) => void;
-    const base = makeBaseStore(() => new Promise<Uint8Array>((r) => (resolve = r)));
+    const base = makeBaseStore(
+      () => new Promise<Uint8Array>((r) => (resolve = r))
+    );
     const store = makeStore(base);
 
     const p1 = store.get('/bar');
@@ -149,7 +156,12 @@ describe('CachedZarrStore stats', () => {
 
     store.resetStats();
 
-    expect(store.stats).toEqual({ requests: 0, cacheHits: 0, deduped: 0, fetches: 0 });
+    expect(store.stats).toEqual({
+      requests: 0,
+      cacheHits: 0,
+      deduped: 0,
+      fetches: 0
+    });
   });
 });
 
