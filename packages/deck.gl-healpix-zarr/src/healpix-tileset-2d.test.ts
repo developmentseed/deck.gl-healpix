@@ -1,7 +1,10 @@
 import { describe, it, expect } from '@jest/globals';
 import { pix2LonLatNest } from 'healpix-ts';
-import { HealpixTileset2D } from './healpix-tileset-2d';
-import { lonLatDistanceSq } from './sort-by-distance';
+import { HealpixTileset2D, computePerTileLOD } from './healpix-tileset-2d';
+import {
+  lonLatDistanceSq,
+  sortTileIndicesByViewportCenter
+} from './sort-by-distance';
 
 type GetTileIndicesArgs = Parameters<HealpixTileset2D['getTileIndices']>[0];
 
@@ -17,6 +20,107 @@ function makeViewport(
 }
 
 const GLOBAL_BOUNDS: [number, number, number, number] = [-180, -90, 180, 90];
+
+describe('sortTileIndicesByViewportCenter', () => {
+  it('accepts (indices, viewport) without a partitionNside argument', () => {
+    const tiles = [
+      { x: 3, y: 1, z: 5 },
+      { x: 0, y: 0, z: 2 }
+    ];
+    const viewport = {
+      longitude: 0,
+      latitude: 0,
+      getBounds: (): [number, number, number, number] => [-180, -90, 180, 90]
+    };
+    const sorted = sortTileIndicesByViewportCenter(tiles, viewport);
+    expect(sorted).toHaveLength(2);
+    const ids = sorted.map((t) => `${t.z}-${t.y}-${t.x}`);
+    expect(ids).toContain('5-1-3');
+    expect(ids).toContain('2-0-0');
+  });
+});
+
+// ── computePerTileLOD ────────────────────────────────────────────────────────
+//
+// Test parameters used throughout:
+//   zoom=5, baseNside=128, basePartitionNside=2, parentLevels=6
+//   availableNsides=[4, 16, 32, 64, 128]
+//
+// Reference width for these parameters:
+//   cellAngularSize = 57.3 / 2 = 28.65 degrees
+//   degreesPerPixel = 360 / (512 * 2^5) = 360 / 16384 ≈ 0.021973
+//   refW = 28.65 / 0.021973 ≈ 1304 pixels
+
+function makeProjectMock(
+  ...results: [number, number][]
+): (xy: number[]) => number[] {
+  let call = 0;
+  return () => results[call++ % results.length] as number[];
+}
+
+describe('computePerTileLOD', () => {
+  const ZOOM = 5;
+  const BASE_NSIDE = 128;
+  const BASE_PARTITION_NSIDE = 2;
+  const PARENT_LEVELS = 6;
+  const AVAILABLE = [4, 16, 32, 64, 128];
+  const XBASE = 0;
+
+  it('falls back to base nside when viewport.project is absent', () => {
+    const viewport = { zoom: ZOOM };
+    const tile = computePerTileLOD(
+      XBASE,
+      BASE_PARTITION_NSIDE,
+      BASE_NSIDE,
+      PARENT_LEVELS,
+      viewport,
+      AVAILABLE
+    );
+    // baseNside=128 → z=7; basePartitionNside=2 → y=1; x unchanged
+    expect(tile).toEqual({ x: 0, y: 1, z: 7 });
+  });
+
+  it('returns base nside for a tile in the bottom portion of the screen (high normalizedY)', () => {
+    // sy1=90, height=100 → normalizedY=0.9 → band [1.0, 1.0] → fraction=1.0 → ndata=128
+    const viewport = {
+      zoom: ZOOM,
+      height: 100,
+      pitch: 60,
+      project: makeProjectMock([0, 90])
+    };
+    const tile = computePerTileLOD(
+      XBASE,
+      BASE_PARTITION_NSIDE,
+      BASE_NSIDE,
+      PARENT_LEVELS,
+      viewport,
+      AVAILABLE
+    );
+    expect(tile).toEqual({ x: 0, y: 1, z: 7 }); // nside=128 unchanged
+  });
+
+  it('steps down to a lower nside for a tile near the top of the screen (far tile)', () => {
+    // sy1=10, height=200 → normalizedY=0.05 → band [0.2, 0.4] → fraction=0.4
+    // targetNside=round(128*0.4)=51 → clamp to 32
+    // partNside=max(1,32>>6)=1 → levelDiff=nside2order(2)-nside2order(1)=1
+    // xd=floor(0/4)=0 → { x:0, y:0, z:5 }
+    const viewport = {
+      zoom: ZOOM,
+      height: 200,
+      pitch: 60,
+      project: makeProjectMock([0, 10])
+    };
+    const tile = computePerTileLOD(
+      XBASE,
+      BASE_PARTITION_NSIDE,
+      BASE_NSIDE,
+      PARENT_LEVELS,
+      viewport,
+      AVAILABLE
+    );
+    expect(tile).toEqual({ x: 0, y: 0, z: 5 }); // nside=32
+  });
+});
 
 describe('HealpixTileset2D.getTileId', () => {
   it('returns z-y-x string for a HealpixTileIndex', () => {
@@ -273,5 +377,46 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     const i16 = ts16.getTileIndices({ viewport });
     // nside=16 has (16/4)^2 = 16x more cells than nside=4
     expect(i16.length).toBe(i4.length * 16);
+  });
+
+  it('returns base nside tiles unchanged when viewport.project is absent (backward-compat)', () => {
+    // This is the current behaviour — existing flat viewports must be unaffected.
+    const ts = new HealpixTileset2D({
+      availableNsides: [4, 128],
+      zoomOffset: 0,
+      parentLevels: 6
+    });
+    // zoom=7 → baseNside=128 → basePartitionNside=max(1,128>>6)=2 → 12*4=48 tiles
+    const viewport = makeViewport(7, GLOBAL_BOUNDS);
+    const tiles = ts.getTileIndices({ viewport });
+    expect(tiles).toHaveLength(48);
+    expect(tiles.every((t) => t.z === 7)).toBe(true); // nside2order(128)=7
+  });
+
+  it('reduces nside and deduplicates when all tiles are near the top of screen (tilted viewport)', () => {
+    // availableNsides=[4,128], parentLevels=6, zoomOffset=0
+    // zoom=7 → baseNside=128, basePartitionNside=2 → 48 candidate cells globally
+    // All project sy1=10, height=200 → normalizedY=0.05 → band [0.2, 0.4] → fraction=0.4
+    // targetNside=round(128*0.4)=51 → clamp to 4 (only [4,128] available)
+    // partNside=max(1,4>>6)=1, levelDiff=nside2order(2)-nside2order(1)=1
+    // xd=floor(x/4) for x∈[0,47] → xd∈[0,11] → 12 unique tiles at z=2
+    const ts = new HealpixTileset2D({
+      availableNsides: [4, 128],
+      zoomOffset: 0,
+      parentLevels: 6
+    });
+    const viewport = {
+      zoom: 7,
+      height: 200,
+      pitch: 60,
+      getBounds: () => GLOBAL_BOUNDS,
+      project: (_xy: number[]) => [0, 10] as [number, number]
+    };
+    const tiles = ts.getTileIndices({ viewport });
+    expect(tiles).toHaveLength(12);
+    expect(tiles.every((t) => t.z === 2)).toBe(true); // nside2order(4)=2
+    // Verify no duplicate tile IDs
+    const ids = tiles.map((t) => `${t.z}-${t.y}-${t.x}`);
+    expect(new Set(ids).size).toBe(12);
   });
 });
