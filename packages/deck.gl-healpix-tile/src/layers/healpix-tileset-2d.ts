@@ -3,9 +3,9 @@ import {
   type _Tileset2DProps as Tileset2DProps
 } from '@deck.gl/geo-layers';
 import { queryBoxInclusiveNest, nside2order, pix2LonLatNest } from 'healpix-ts';
-import { sortTileIndicesByViewportCenter } from './sort-by-distance';
-import type { HealpixTileIndex } from './types';
-import { getNsideForZoom, clampToAvailable } from './utils';
+import { sortTileIndicesByViewportCenter } from '../lib/sort-by-distance';
+import type { HealpixTileIndex } from '../types';
+import { getNsideForZoom, clampToAvailable } from '../lib/utils';
 
 // Extra fields accepted by setOptions (and optionally by the constructor).
 type HealpixExtras = {
@@ -156,8 +156,6 @@ export class HealpixTileset2D extends Tileset2D {
     }
   }
 
-  // ── nside / order helpers ─────────────────────────────────────────────────
-
   /**
    * Returns the data nside appropriate for `zoom`, clamped to the available
    * nsides declared in the Zarr pyramid metadata.
@@ -184,8 +182,6 @@ export class HealpixTileset2D extends Tileset2D {
   partitionNside(nside: number): number {
     return Math.max(1, nside >> this._parentLevels);
   }
-
-  // ── Tileset2D overrides ────────────────────────────────────────────────────
 
   override getTileIndices({
     viewport

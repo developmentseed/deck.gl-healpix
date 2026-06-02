@@ -4,7 +4,7 @@ import { HealpixTileset2D, computePerTileLOD } from './healpix-tileset-2d';
 import {
   lonLatDistanceSq,
   sortTileIndicesByViewportCenter
-} from './sort-by-distance';
+} from '../lib/sort-by-distance';
 
 type GetTileIndicesArgs = Parameters<HealpixTileset2D['getTileIndices']>[0];
 
@@ -205,7 +205,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   });
 
   it('with parentLevels=2, queries at nside/4 (48 tiles for nside=4 globally)', () => {
-    // nside=4, parentLevels=2 => nsideParent = 4>>2 = 1 => 12 tiles
+    // nside=4, parentLevels=2 => nsideParent = 4>>2 = 1 => 12*1 = 12 tiles
     // Actually 4>>2 = 1, so nsideParent=1 => 12*1 = 12 tiles
     const ts = new HealpixTileset2D({
       availableNsides: [4],
