@@ -39,12 +39,24 @@ jobs:
       - name: Build packages
         run: npm run build -- --scope '@developmentseed/*'
 
+      - name: Build Home
+        run: |
+          mkdir -p dist
+          echo "Building example: Home"
+          cd examples/_home
+          cp .env.example .env
+          export VITE_BASE_URL=https://deck.gl-healpix.ds.io
+          npm run build
+          cd ../..
+          echo "Preparing Home"
+          cp -r "examples/_home/dist/." "dist/"
+
       - name: Build examples
         run: |
           mkdir -p dist/examples
           for dir in examples/*/; do
             example=$(basename "$dir")
-            if [[ "$example" == "_shared" ]]; then
+            if [[ "$example" == _* ]]; then
               continue
             fi
 
