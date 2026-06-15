@@ -1,5 +1,4 @@
 // Minimal stub for @deck.gl/geo-layers used in Jest (no WebGL needed).
-import type { HealpixTileIndex } from '../types';
 
 export class _Tileset2D {
   opts: Record<string, unknown> = {};
@@ -13,13 +12,13 @@ export class _Tileset2D {
   getTileIndices(_opts: { viewport?: unknown }) {
     return [];
   }
-  getTileId(index: HealpixTileIndex) {
+  getTileId(index: unknown) {
     return String(index);
   }
-  getTileZoom(_index: HealpixTileIndex) {
+  getTileZoom(_index: unknown) {
     return 0;
   }
-  getParentIndex(index: HealpixTileIndex) {
+  getParentIndex(index: unknown) {
     return index;
   }
 }
@@ -36,6 +35,7 @@ export class TileLayer {
     this.props = props;
   }
   initializeState() {}
+  updateState(_params: unknown) {}
   setState(s: Record<string, unknown>) {
     Object.assign(this.state, s);
   }

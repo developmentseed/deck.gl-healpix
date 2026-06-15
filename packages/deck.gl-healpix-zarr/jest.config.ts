@@ -20,7 +20,9 @@ const config: Config = {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^zarrita$': '<rootDir>/../../node_modules/zarrita/dist/src/index.js',
     '^@deck\\.gl/geo-layers$': '<rootDir>/src/__mocks__/deck-geo-layers.ts',
-    '^@developmentseed/deck\\.gl-healpix$': '<rootDir>/src/__mocks__/healpix-layer.ts'
+    '^@developmentseed/deck\\.gl-healpix$': '<rootDir>/src/__mocks__/healpix-layer.ts',
+    '^@developmentseed/deck\\.gl-healpix-tile$':
+      '<rootDir>/../../packages/deck.gl-healpix-tile/src/index.ts'
   },
   transformIgnorePatterns: [
     '/node_modules/(?!zarrita/)'

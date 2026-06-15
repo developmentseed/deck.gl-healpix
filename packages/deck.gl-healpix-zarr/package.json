@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@developmentseed/deck.gl-healpix": "*",
+    "@developmentseed/deck.gl-healpix-tile": "*",
     "healpix-ts": "^1.0.0",
     "zarrita": "^0.6.1"
   },
