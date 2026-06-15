@@ -1,11 +1,11 @@
 import * as zarr from 'zarrita';
 import { CachedZarrStore } from './cached-zarr-store';
-import { rowRangeFromOffsetPair } from './utils';
-import type { HealpixZarrTileData } from './types';
+import { rowRangeFromOffsetPair } from '@developmentseed/deck.gl-healpix-tile';
+import type { HealpixTileData } from '@developmentseed/deck.gl-healpix-tile';
 
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Public types
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export interface ZarrPyramidMetadata {
   bands: string[];
@@ -25,17 +25,17 @@ export interface GroupHandle {
   allBands: string[];
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Caches — shared across all layer instances pointing to the same URL
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 const rootCache = new Map<string, Promise<zarr.Group<CachedZarrStore>>>();
 const metadataCache = new Map<string, Promise<ZarrPyramidMetadata>>();
 const groupCache = new Map<string, Promise<GroupHandle>>();
 
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Store / root access
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export function getRoot(url: string): Promise<zarr.Group<CachedZarrStore>> {
   if (!rootCache.has(url)) {
@@ -64,9 +64,9 @@ export async function loadRootMetadata(
   return metadataCache.get(url)!;
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Group handle — opened once per (url, nside) pair
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export function getGroupHandle(
   url: string,
@@ -109,9 +109,9 @@ export function getGroupHandle(
   return groupCache.get(key)!;
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // Tile loader
-// ──────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 
 export function assembleTileData(
   nside: number,
@@ -119,7 +119,7 @@ export function assembleTileData(
   rawCellIds: ArrayLike<number | bigint>,
   bandSlices: ArrayLike<number>[],
   selectedBands: string[]
-): HealpixZarrTileData | null {
+): HealpixTileData | null {
   const range = rowRangeFromOffsetPair(parentOffsets);
   if (!range) return null;
 
@@ -147,7 +147,7 @@ export async function loadTileFromGroup(
   parentCell: number,
   selectedBands: string[],
   signal?: AbortSignal
-): Promise<HealpixZarrTileData | null> {
+): Promise<HealpixTileData | null> {
   if (selectedBands.length === 0) return null;
   if (signal?.aborted) return null;
 
