@@ -5,6 +5,7 @@ import { Route, Routes } from 'react-router';
 import PageAnimation from '$pages/animation';
 import PageColor from '$pages/color';
 import PagePaint from '$pages/paint';
+import PageTiles from '$pages/tiles';
 import { PageLayout } from '$shared/components/page-layout';
 
 // Root component.
@@ -19,13 +20,15 @@ function Root() {
       navItems={[
         { label: 'Cell Rendering', to: '/' },
         { label: 'Color Visualization', to: '/color' },
-        { label: 'Paint', to: '/paint' }
+        { label: 'Paint', to: '/paint' },
+        { label: 'Tiles', to: '/tiles' }
       ]}
     >
       <Routes>
         <Route path='/' element={<PageAnimation />} />
         <Route path='/color' element={<PageColor />} />
         <Route path='/paint' element={<PagePaint />} />
+        <Route path='/tiles' element={<PageTiles />} />
       </Routes>
     </PageLayout>
   );
