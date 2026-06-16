@@ -59,9 +59,11 @@ const defaultProps = {
   TilesetClass: HealpixTileset2D
 } as unknown as DefaultProps<_HealpixTileLayerProps>;
 
-export class HealpixTileLayer extends TileLayer<
+export class HealpixTileLayer<
+  ExtraPropsT extends object = object
+> extends TileLayer<
   HealpixTileData | null,
-  _HealpixTileLayerProps
+  _HealpixTileLayerProps & ExtraPropsT
 > {
   static layerName = 'HealpixTileLayer';
   static defaultProps = defaultProps;
@@ -84,21 +86,18 @@ export class HealpixTileLayer extends TileLayer<
   refreshTileData(filter?: (index: HealpixTileIndex) => boolean): void {
     const { tileset } = this.state;
     if (!tileset) return;
+
     if (!filter) {
       tileset.reloadAll();
       this.setNeedsUpdate();
       return;
     }
-    const cache = (
-      tileset as unknown as {
-        _cache: Map<string, { index: unknown; reset(): void }>;
+
+    tileset.tiles.forEach((tile) => {
+      if (tile && filter(tile.index)) {
+        tile.setNeedsReload();
       }
-    )._cache;
-    for (const tile of cache.values()) {
-      if (filter(tile.index as HealpixTileIndex)) {
-        tile.reset();
-      }
-    }
+    });
     this.setNeedsUpdate();
   }
 
