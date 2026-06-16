@@ -10,7 +10,13 @@ import { getNsideForZoom, clampToAvailable } from '../lib/utils';
 // Extra fields accepted by setOptions (and optionally by the constructor).
 type HealpixExtras = {
   availableNsides?: number[];
-  zoomOffset?: number;
+  /**
+   * Offset added to the deck.gl zoom before computing the data nside.
+   * The data nside is computed as `nside = 2^round(zoom + nsideOffset)`, then clamped
+   * to the available nsides.
+   * @default 5
+   */
+  nsideOffset?: number;
   /**
    * Number of HEALPix levels between the data nside and the partition nside.
    * partition_nside = max(1, data_nside / 2^parentLevels).
@@ -128,7 +134,7 @@ export function computePerTileLOD(
  */
 export class HealpixTileset2D extends Tileset2D {
   private _availableNsides: number[];
-  private _zoomOffset: number;
+  private _nsideOffset: number;
   private _parentLevels: number;
 
   constructor(opts: HealpixTileset2DOptions) {
@@ -139,7 +145,7 @@ export class HealpixTileset2D extends Tileset2D {
     });
     // Fields are initialised via setOptions, which the base constructor already called.
     this._availableNsides ??= [];
-    this._zoomOffset ??= 5;
+    this._nsideOffset ??= 5;
     this._parentLevels ??= 6;
   }
 
@@ -148,8 +154,8 @@ export class HealpixTileset2D extends Tileset2D {
     if (opts.availableNsides !== undefined) {
       this._availableNsides = opts.availableNsides;
     }
-    if (opts.zoomOffset !== undefined) {
-      this._zoomOffset = opts.zoomOffset;
+    if (opts.nsideOffset !== undefined) {
+      this._nsideOffset = opts.nsideOffset;
     }
     if (opts.parentLevels !== undefined) {
       this._parentLevels = opts.parentLevels;
@@ -161,7 +167,7 @@ export class HealpixTileset2D extends Tileset2D {
    * nsides declared in the Zarr pyramid metadata.
    */
   nsideForZoom(zoom: number): number {
-    return getNsideForZoom(zoom, this._zoomOffset, this._availableNsides);
+    return getNsideForZoom(zoom, this._nsideOffset, this._availableNsides);
   }
 
   /**

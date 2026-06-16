@@ -100,7 +100,7 @@ export default function PageZarrTiles() {
         id: 'sentinel-zarr',
         url: ZARR_URL,
         bands: selectedBands,
-        zoomOffset: 5,
+        nsideOffset: 5,
         colorMode: isNdvi ? HEALPIX_COLOR_MODE_SCALAR : HEALPIX_COLOR_MODE_RGB,
         shaderModules,
         onStats: setLayerStats,

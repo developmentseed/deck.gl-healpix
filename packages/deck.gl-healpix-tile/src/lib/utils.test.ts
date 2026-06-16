@@ -34,13 +34,13 @@ describe('clampToAvailable', () => {
 describe('getNsideForZoom', () => {
   const available = [1, 4, 16, 64, 256];
 
-  it('returns nside = 2^round(zoom + zoomOffset) clamped to available', () => {
-    // zoom=0, zoomOffset=0 => 2^0 = 1
+  it('returns nside = 2^round(zoom + nsideOffset) clamped to available', () => {
+    // zoom=0, nsideOffset=0 => 2^0 = 1
     expect(getNsideForZoom(0, 0, available)).toBe(1);
   });
 
-  it('uses zoomOffset to shift nside selection', () => {
-    // zoom=0, zoomOffset=2 => 2^2 = 4
+  it('uses nsideOffset to shift nside selection', () => {
+    // zoom=0, nsideOffset=2 => 2^2 = 4
     expect(getNsideForZoom(0, 2, available)).toBe(4);
   });
 
@@ -53,7 +53,7 @@ describe('getNsideForZoom', () => {
   });
 
   it('rounds zoom fractional values', () => {
-    // zoom=1.5, zoomOffset=0 => 2^round(1.5) = 2^2 = 4
+    // zoom=1.5, nsideOffset=0 => 2^round(1.5) = 2^2 = 4
     expect(getNsideForZoom(1.5, 0, available)).toBe(4);
   });
 });

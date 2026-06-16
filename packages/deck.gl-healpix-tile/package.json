@@ -1,6 +1,6 @@
 {
   "name": "@developmentseed/deck.gl-healpix-tile",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "HEALPix tile layer for deck.gl",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

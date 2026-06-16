@@ -72,7 +72,7 @@ type HealpixTileData = {
 | `debugTiles` | `boolean` | `false` | Yellow border and `z-y-x` label on each loaded tile |
 | `onStats` | `function` | — | Called after each update with `HealpixTileLayerStats` |
 
-Other `TileLayer` props are forwarded (`maxCacheSize`, `refinementStrategy`, `zoomOffset`, …).
+Other `TileLayer` props are forwarded (`maxCacheSize`, `refinementStrategy`, …).
 
 ### `refreshTileData(filter?)`
 

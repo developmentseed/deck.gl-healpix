@@ -51,7 +51,7 @@ All visual and tile-control props come from `HealpixTileLayer` — see [@develop
 
 | prop | type | default | description |
 |------|------|---------|-------------|
-| `zoomOffset` | `number` | (TileLayer) | Shifts the zoom-to-nside mapping. **Advanced:** rarely needs adjustment; changing the default loads significantly more data. |
+| `nsideOffset` | `number` | `5` | Shifts the zoom-to-nside mapping: `nside = 2^round(zoom + nsideOffset)`. **Advanced:** rarely needs adjustment; changing the default loads significantly more data. |
 | `colorMode` | `number` | RGB | Forwarded to `HealpixCellsLayer` |
 | `colorMap` | `Uint8Array` | — | 256×4 RGBA LUT for scalar modes |
 | `rescaleMin` / `rescaleMax` | `number` | — | Scalar range → colorMap indices 0–255 |
