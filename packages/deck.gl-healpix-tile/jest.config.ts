@@ -19,6 +19,7 @@ const config: Config = {
   moduleNameMapper: {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '^@deck\\.gl/geo-layers$': '<rootDir>/src/__mocks__/deck-geo-layers.ts',
+    '^@deck\\.gl/layers$': '<rootDir>/src/__mocks__/deck-layers.ts',
     '^@developmentseed/deck\\.gl-healpix$': '<rootDir>/src/__mocks__/healpix-layer.ts'
   }
 };

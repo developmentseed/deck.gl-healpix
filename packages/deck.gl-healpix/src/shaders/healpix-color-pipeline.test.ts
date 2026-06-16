@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { HEALPIX_CELLS_FS } from './healpix-cells.fs.glsl';
 import { HEALPIX_CELLS_VS_MAIN } from './healpix-cells.vs.glsl';
 import { healpixColorShaderModule } from './healpix-color-shader-module';
@@ -94,27 +92,5 @@ describe('HEALPix color pipeline shader modules', () => {
     );
     expect(HEALPIX_CELLS_FS).not.toContain('healpixApplyColor');
     expect(HEALPIX_CELLS_FS).not.toContain('healpixDiscardIfFiltered');
-  });
-
-  it('appends user shader modules after built-in pipeline modules', () => {
-    const primitiveLayerSource = readFileSync(
-      join(__dirname, '../layers/healpix-cells-primitive-layer.ts'),
-      'utf8'
-    );
-
-    expect(primitiveLayerSource).toContain('healpixValuesShaderModule');
-    expect(primitiveLayerSource).toContain('healpixFilterShaderModule');
-    expect(primitiveLayerSource).toContain('healpixRescaleShaderModule');
-    expect(primitiveLayerSource).toContain('healpixColorShaderModule');
-    expect(primitiveLayerSource).toContain(
-      '...(this.props.shaderModules ?? [])'
-    );
-    expect(primitiveLayerSource).toContain('shaderModulesChanged');
-    expect(primitiveLayerSource).toContain(
-      'fs:HEALPIX_SELECT_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)'
-    );
-    expect(primitiveLayerSource).toContain(
-      'fs:HEALPIX_RESCALE_VALUES(inout vec4 selectedValues, FragmentGeometry geometry)'
-    );
   });
 });

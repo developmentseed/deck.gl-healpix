@@ -55,7 +55,7 @@ describe('HealpixTileLayer.refreshTileData', () => {
       getTileData: () => Promise.resolve(null)
     });
     const reloadAll = jest.fn();
-    layer.state = { tileset: { reloadAll, _cache: new Map() } as any };
+    layer.state = { tileset: { reloadAll, tiles: [] } as any };
     layer.refreshTileData();
     expect(reloadAll).toHaveBeenCalledTimes(1);
   });
@@ -72,21 +72,18 @@ describe('HealpixTileLayer.refreshTileData', () => {
     const layer = new HealpixTileLayer({
       getTileData: () => Promise.resolve(null)
     });
-    const tile0 = { index: { x: 0, y: 0, z: 1 }, reset: jest.fn() };
-    const tile1 = { index: { x: 1, y: 0, z: 1 }, reset: jest.fn() };
+    const tile0 = { index: { x: 0, y: 0, z: 1 }, setNeedsReload: jest.fn() };
+    const tile1 = { index: { x: 1, y: 0, z: 1 }, setNeedsReload: jest.fn() };
     const reloadAll = jest.fn();
     layer.state = {
       tileset: {
         reloadAll,
-        _cache: new Map([
-          ['1-0-0', tile0],
-          ['1-0-1', tile1]
-        ])
+        tiles: [tile0, tile1]
       } as any
     };
     layer.refreshTileData((idx) => idx.x === 0);
-    expect(tile0.reset).toHaveBeenCalledTimes(1);
-    expect(tile1.reset).not.toHaveBeenCalled();
+    expect(tile0.setNeedsReload).toHaveBeenCalledTimes(1);
+    expect(tile1.setNeedsReload).not.toHaveBeenCalled();
     expect(reloadAll).not.toHaveBeenCalled();
   });
 });
