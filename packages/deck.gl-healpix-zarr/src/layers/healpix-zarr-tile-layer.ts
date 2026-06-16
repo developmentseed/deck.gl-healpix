@@ -54,13 +54,9 @@ const defaultProps = {
 // Layer
 // -----------------------------------------------------------------------------
 
-export class HealpixZarrTileLayer extends HealpixTileLayer {
+export class HealpixZarrTileLayer extends HealpixTileLayer<_HealpixZarrTileLayerProps> {
   static layerName = 'HealpixZarrTileLayer';
   static defaultProps = defaultProps;
-
-  constructor(props: HealpixZarrTileLayerProps) {
-    super(props as unknown as HealpixTileLayerProps);
-  }
 
   declare state: Omit<HealpixTileLayer['state'], 'tileset'> & {
     tileset: HealpixTileset2D | null;
@@ -74,13 +70,14 @@ export class HealpixZarrTileLayer extends HealpixTileLayer {
   }
 
   override updateState(params: UpdateParameters<this>): void {
-    const props = params.props as unknown as HealpixZarrTileLayerProps;
-    const oldProps = params.oldProps as unknown as HealpixZarrTileLayerProps;
     const { changeFlags } = params;
 
     // When bands change, signal TileLayer to call tileset.reloadAll() via the
     // updateTriggersChanged.getTileData mechanism in its own updateState.
-    if (changeFlags.propsChanged && props.bands !== oldProps.bands) {
+    if (
+      changeFlags.propsChanged &&
+      params.props.bands !== params.oldProps.bands
+    ) {
       changeFlags.updateTriggersChanged = changeFlags.updateTriggersChanged
         ? {
             ...(changeFlags.updateTriggersChanged as Record<string, true>),
@@ -91,14 +88,13 @@ export class HealpixZarrTileLayer extends HealpixTileLayer {
 
     super.updateState(params);
 
-    if (changeFlags.propsChanged && props.url !== oldProps.url) {
+    if (changeFlags.propsChanged && params.props.url !== params.oldProps.url) {
       this._loadMetadata();
     }
   }
 
   private async _loadMetadata(): Promise<void> {
-    const { url, onMetadata } = this
-      .props as unknown as HealpixZarrTileLayerProps;
+    const { url, onMetadata } = this.props;
     if (!url) return;
     try {
       const root = await getRoot(url);
@@ -125,7 +121,7 @@ export class HealpixZarrTileLayer extends HealpixTileLayer {
   }
 
   override getTileData(tile: { index: unknown; signal?: AbortSignal }) {
-    const { url, bands } = this.props as unknown as HealpixZarrTileLayerProps;
+    const { url, bands } = this.props;
     if (!bands || bands.length === 0) return Promise.resolve(null);
     const { x: parentCell, z } = tile.index as HealpixTileIndex;
     // tileset is always present when getTileData is invoked (TileLayer guarantee)
