@@ -2,7 +2,7 @@
   "name": "deck.gl-healpix-zarr-tiles",
   "private": true,
   "description": "Example of using deck.gl-healpix-zarr to render HEALPix tiles from a Zarr store.",
-  "version": "1.0.0",
+  "version": "0.3.0",
   "author": {
     "name": "Daniel da Silva",
     "email": "daniel@develpmentseed.org",
@@ -41,7 +41,7 @@
     "@deck.gl/layers": "^9.3.1",
     "@deck.gl/mapbox": "^9.3.1",
     "@deck.gl/react": "^9.3.1",
-    "@developmentseed/deck.gl-healpix-zarr": "*",
+    "@developmentseed/deck.gl-healpix-zarr": "^0.3.0",
     "@emotion/react": "^11.14.0",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",

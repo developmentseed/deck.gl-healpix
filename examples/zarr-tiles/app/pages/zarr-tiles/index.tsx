@@ -18,10 +18,8 @@ import {
   HEALPIX_COLOR_MODE_SCALAR,
   makeColorMap
 } from '@developmentseed/deck.gl-healpix';
-import {
-  HealpixZarrTileLayer,
-  type HealpixZarrLayerStats
-} from '@developmentseed/deck.gl-healpix-zarr';
+import { HealpixTileLayerStats } from '@developmentseed/deck.gl-healpix-tile';
+import { HealpixZarrTileLayer } from '@developmentseed/deck.gl-healpix-zarr';
 
 import {
   ColorSchemeSelect,
@@ -64,7 +62,7 @@ export default function PageZarrTiles() {
   const [colorScheme, setColorScheme] =
     useState<ColorSchemeName>('interpolateViridis');
   const [debugTiles, setDebugTiles] = useState(false);
-  const [layerStats, setLayerStats] = useState<HealpixZarrLayerStats>({
+  const [layerStats, setLayerStats] = useState<HealpixTileLayerStats>({
     nside: 0,
     nsideParent: 0,
     tilesRendered: 0,
@@ -102,7 +100,7 @@ export default function PageZarrTiles() {
         id: 'sentinel-zarr',
         url: ZARR_URL,
         bands: selectedBands,
-        zoomOffset: 5,
+        nsideOffset: 5,
         colorMode: isNdvi ? HEALPIX_COLOR_MODE_SCALAR : HEALPIX_COLOR_MODE_RGB,
         shaderModules,
         onStats: setLayerStats,
