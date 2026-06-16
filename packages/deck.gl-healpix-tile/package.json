@@ -1,11 +1,14 @@
 {
   "name": "@developmentseed/deck.gl-healpix-tile",
-  "version": "0.1.2",
+  "version": "0.3.0",
   "description": "HEALPix tile layer for deck.gl",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
     "build": "rollup -c ../../rollup.config.mjs",
     "build:watch": "rollup -c ../../rollup.config.mjs --watch",
@@ -36,7 +39,7 @@
     "@luma.gl/shadertools": "9.3.3"
   },
   "dependencies": {
-    "@developmentseed/deck.gl-healpix": "*",
+    "@developmentseed/deck.gl-healpix": "^0.3.0",
     "healpix-ts": "^1.0.0"
   },
   "devDependencies": {

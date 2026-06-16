@@ -1,6 +1,6 @@
 {
   "name": "@developmentseed/deck.gl-healpix-zarr",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "HEALPix Zarr tile pyramid layer for deck.gl",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -38,8 +38,8 @@
     "@luma.gl/engine": "9.3.3"
   },
   "dependencies": {
-    "@developmentseed/deck.gl-healpix": "*",
-    "@developmentseed/deck.gl-healpix-tile": "*",
+    "@developmentseed/deck.gl-healpix": "^0.3.0",
+    "@developmentseed/deck.gl-healpix-tile": "^0.3.0",
     "healpix-ts": "^1.0.0",
     "zarrita": "^0.6.1"
   },
