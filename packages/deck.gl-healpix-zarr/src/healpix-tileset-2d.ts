@@ -2,10 +2,10 @@ import {
   _Tileset2D as Tileset2D,
   type _Tileset2DProps as Tileset2DProps
 } from '@deck.gl/geo-layers';
-import { queryBoxInclusiveNest, nside2order } from 'healpix-ts';
+import { queryBoxInclusiveNest, nside2order, pix2LonLatNest } from 'healpix-ts';
 import { sortTileIndicesByViewportCenter } from './sort-by-distance';
 import type { HealpixTileIndex } from './types';
-import { getNsideForZoom } from './utils';
+import { getNsideForZoom, clampToAvailable } from './utils';
 
 // Extra fields accepted by setOptions (and optionally by the constructor).
 type HealpixExtras = {
@@ -26,6 +26,85 @@ type HealpixExtras = {
 
 export type HealpixTileset2DOptions = Omit<Tileset2DProps, 'getTileData'> &
   HealpixExtras;
+
+/**
+ * Compute a LOD-adjusted tile index for a single partition-level cell.
+ *
+ * When `viewport.project` is available, reduces the data nside for tiles that
+ * project to a small screen footprint (e.g., far tiles in a tilted viewport).
+ * Falls back to `baseNside` for all tiles when `project` is absent (e.g., in
+ * tests that use a minimal viewport mock).
+ *
+ * @param xBase              Cell number at basePartitionNside (NESTED ordering).
+ * @param basePartitionNside Partition nside for the current zoom level.
+ * @param baseNside          Maximum data nside (from nsideForZoom).
+ * @param parentLevels       Levels separating data nside from partition nside.
+ * @param viewport           Deck.gl viewport — zoom and optional project.
+ * @param availableNsides    Nsides present in the Zarr pyramid.
+ */
+export function computePerTileLOD(
+  xBase: number,
+  basePartitionNside: number,
+  baseNside: number,
+  parentLevels: number,
+  viewport: {
+    zoom: number;
+    height?: number;
+    pitch?: number;
+    project?(xy: number[]): number[];
+  },
+  availableNsides: number[]
+): HealpixTileIndex {
+  const partitionNsideFn = (n: number): number =>
+    Math.max(1, n >> parentLevels);
+
+  // Only consider nsides at or below the base level (LOD can only reduce, not increase).
+  const nsidesToConsider = availableNsides.filter((n) => n <= baseNside);
+  const minNside = nsidesToConsider.reduce((a, b) => Math.min(a, b), baseNside);
+
+  /** Build a HealpixTileIndex for the given data nside, remapping x to its new partition. */
+  const makeTile = (ndata: number): HealpixTileIndex => {
+    const partNside = partitionNsideFn(ndata);
+    const levelDiff = nside2order(basePartitionNside) - nside2order(partNside);
+    // Math.floor instead of >> to stay safe with cell indices beyond 2^31.
+    const xd = Math.floor(xBase / Math.pow(4, levelDiff));
+    return { x: xd, y: nside2order(partNside), z: nside2order(ndata) };
+  };
+
+  // Fallback: no projection capability → return base nside unchanged.
+  if (!viewport.project) {
+    return makeTile(baseNside);
+  }
+
+  const [lon, lat] = pix2LonLatNest(basePartitionNside, xBase);
+  const [, sy1] = viewport.project([lon, lat]);
+
+  // No height available (e.g. test mocks without pitch support) → skip LOD bands.
+  if (!viewport.height) {
+    return makeTile(baseNside);
+  }
+
+  // Map normalised screen-Y to nside fraction. In a flat-map (pitched) viewport
+  // top of screen = far = low detail, bottom = near = full detail.
+  // Each entry is [yThreshold, nsideFraction] where y = sy1 / viewport.height.
+  // Band effect is scaled by pitch: at pitch=0 all tiles get full detail.
+  const LOD_BANDS: [number, number][] = [
+    [0.2, 0.4],
+    [0.4, 0.8],
+    [1.0, 1.0]
+  ];
+  const pitchFactor = Math.min((viewport.pitch ?? 0) / 60, 1.0);
+  const normalizedY = sy1 / viewport.height;
+  const bandFraction = LOD_BANDS.find(([t]) => normalizedY <= t)?.[1] ?? 1.0;
+  const fraction = 1.0 - (1.0 - bandFraction) * pitchFactor;
+  const targetNside = Math.round(baseNside * fraction);
+  const ndata = clampToAvailable(
+    Math.max(targetNside, minNside),
+    nsidesToConsider
+  );
+
+  return makeTile(ndata);
+}
 
 /**
  * Tileset2D subclass that maps deck.gl viewports to HEALPix tile indices.
@@ -111,18 +190,43 @@ export class HealpixTileset2D extends Tileset2D {
   override getTileIndices({
     viewport
   }: {
-    viewport: { zoom: number; getBounds(): [number, number, number, number] };
+    viewport: {
+      zoom: number;
+      height?: number;
+      pitch?: number;
+      getBounds(): [number, number, number, number];
+      project?(xy: number[]): number[];
+    };
   }): HealpixTileIndex[] {
     if (this._availableNsides.length === 0) return [];
 
-    const nside = this.nsideForZoom(viewport.zoom);
-    const z = nside2order(nside);
-    const nsideParent = this.partitionNside(nside);
-    const y = nside2order(nsideParent);
+    const baseNside = this.nsideForZoom(viewport.zoom);
+    const basePartitionNside = this.partitionNside(baseNside);
     const bbox = viewport.getBounds();
-    const cells = queryBoxInclusiveNest(nsideParent, bbox);
-    const indices = cells.map((x) => ({ x, y, z }));
-    return sortTileIndicesByViewportCenter(indices, nsideParent, viewport);
+    const candidates = queryBoxInclusiveNest(basePartitionNside, bbox);
+
+    // Apply per-tile LOD: each candidate cell may receive a different data nside.
+    const raw = candidates.map((xBase) =>
+      computePerTileLOD(
+        xBase,
+        basePartitionNside,
+        baseNside,
+        this._parentLevels,
+        viewport,
+        this._availableNsides
+      )
+    );
+
+    // Deduplicate: multiple base-partition cells can collapse to the same lower-nside tile.
+    const seen = new Set<string>();
+    const deduped = raw.filter((idx) => {
+      const id = this.getTileId(idx);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    return sortTileIndicesByViewportCenter(deduped, viewport);
   }
 
   override getTileId(index: HealpixTileIndex): string {

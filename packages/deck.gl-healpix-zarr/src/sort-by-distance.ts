@@ -32,10 +32,11 @@ export function viewportCenterLonLat(viewport: {
 
 /**
  * Reorders tile indices by increasing distance from the viewport center.
+ * Uses each tile's own partition nside (derived from index.y as 2^y) rather
+ * than a shared partition nside, so mixed-LOD tile sets are sorted correctly.
  */
 export function sortTileIndicesByViewportCenter(
   indices: HealpixTileIndex[],
-  partitionNside: number,
   viewport: {
     getBounds(): [number, number, number, number];
     longitude?: number;
@@ -47,7 +48,7 @@ export function sortTileIndicesByViewportCenter(
   const [centerLon, centerLat] = viewportCenterLonLat(viewport);
   return indices
     .map((index) => {
-      const [lon, lat] = pix2LonLatNest(partitionNside, index.x);
+      const [lon, lat] = pix2LonLatNest(1 << index.y, index.x);
       return {
         index,
         dist: lonLatDistanceSq(lon, lat, centerLon, centerLat)

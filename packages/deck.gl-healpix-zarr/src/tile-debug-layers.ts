@@ -39,7 +39,7 @@ export function createTileDebugLayers(opts: TileDebugLayerOptions) {
       getColor: [255, 255, 255, 255],
       getSize: 14,
       getTextAnchor: 'middle',
-      getAlignmentBaseline: 'center',
+      getAlignmentBaseline: 'bottom',
       outlineWidth: 2,
       outlineColor: [0, 0, 0, 200],
       pickable: false
