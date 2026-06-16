@@ -52,7 +52,7 @@ export function PageLayout(props: {
   title?: string;
   navItems?: NavItem[];
 }) {
-  const { children, title = import.meta.env.VITE_APP_TITLE, navItems } = props;
+  const { children, title = 'HEALPix Layers', navItems } = props;
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (

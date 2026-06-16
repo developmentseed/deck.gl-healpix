@@ -12,6 +12,11 @@
       (function () {
         var l = window.location;
         var pathSegmentsToKeep = 2;
+        var segments = l.pathname.split('/').filter(Boolean);
+        if (segments.length < pathSegmentsToKeep) {
+          l.replace(l.protocol + '//' + l.host + '/');
+          return;
+        }
         var base = l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/');
         var rest = l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/');
         l.replace(
