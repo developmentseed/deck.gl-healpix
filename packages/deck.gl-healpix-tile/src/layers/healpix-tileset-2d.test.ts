@@ -4,7 +4,7 @@ import { HealpixTileset2D, computePerTileLOD } from './healpix-tileset-2d';
 import {
   lonLatDistanceSq,
   sortTileIndicesByViewportCenter
-} from './sort-by-distance';
+} from '../lib/sort-by-distance';
 
 type GetTileIndicesArgs = Parameters<HealpixTileset2D['getTileIndices']>[0];
 
@@ -179,7 +179,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   it('returns an array of HealpixTileIndex objects', () => {
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -196,7 +196,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // parentLevels=0 => nsideParent = nside = 4 => 12*16 = 192 tiles
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -205,11 +205,11 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   });
 
   it('with parentLevels=2, queries at nside/4 (48 tiles for nside=4 globally)', () => {
-    // nside=4, parentLevels=2 => nsideParent = 4>>2 = 1 => 12 tiles
+    // nside=4, parentLevels=2 => nsideParent = 4>>2 = 1 => 12*1 = 12 tiles
     // Actually 4>>2 = 1, so nsideParent=1 => 12*1 = 12 tiles
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 2
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -221,7 +221,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // nside=4, parentLevels=1 => nsideParent = 4>>1 = 2 => 12*4 = 48 tiles
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 1
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -233,7 +233,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // nside=4, parentLevels=6 => 4>>6 = 0, clamped to 1 => 12 tiles
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 6
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -245,7 +245,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // nside=256, parentLevels=6 => nsideParent = 256>>6 = 4 => 12*16 = 192 tiles
     const ts = new HealpixTileset2D({
       availableNsides: [256],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 6
     });
     const viewport = makeViewport(8, GLOBAL_BOUNDS);
@@ -264,7 +264,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // Start with no available nsides (simulates layer before metadata loads).
     const ts = new HealpixTileset2D({
       availableNsides: [],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -278,7 +278,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   it('reflects updated parentLevels after setOptions', () => {
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 0
     });
     const viewport = makeViewport(2, GLOBAL_BOUNDS);
@@ -293,7 +293,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // nside=256, parentLevels=6 => nsideParent=4, but z should encode data nside=256 => z=8
     const ts = new HealpixTileset2D({
       availableNsides: [256],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 6
     });
     const viewport = makeViewport(8, GLOBAL_BOUNDS);
@@ -304,7 +304,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   it('sorts tiles by increasing distance from viewport center', () => {
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 0
     });
     const centerLon = -74;
@@ -337,7 +337,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   it('sorting does not change which tiles are selected', () => {
     const ts = new HealpixTileset2D({
       availableNsides: [4],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 0
     });
     const bbox: [number, number, number, number] = [-10, 40, 10, 55];
@@ -360,16 +360,16 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     expect(idsA.length).toBeGreaterThan(1);
   });
 
-  it('uses zoomOffset to shift data nside selection', () => {
+  it('uses nsideOffset to shift data nside selection', () => {
     // Both use parentLevels=0 so nsideParent=nside, making tile counts directly comparable
     const ts4 = new HealpixTileset2D({
       availableNsides: [4, 16],
-      zoomOffset: 2,
+      nsideOffset: 2,
       parentLevels: 0
     });
     const ts16 = new HealpixTileset2D({
       availableNsides: [4, 16],
-      zoomOffset: 4,
+      nsideOffset: 4,
       parentLevels: 0
     });
     const viewport = makeViewport(0, GLOBAL_BOUNDS);
@@ -383,7 +383,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // This is the current behaviour — existing flat viewports must be unaffected.
     const ts = new HealpixTileset2D({
       availableNsides: [4, 128],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 6
     });
     // zoom=7 → baseNside=128 → basePartitionNside=max(1,128>>6)=2 → 12*4=48 tiles
@@ -394,7 +394,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
   });
 
   it('reduces nside and deduplicates when all tiles are near the top of screen (tilted viewport)', () => {
-    // availableNsides=[4,128], parentLevels=6, zoomOffset=0
+    // availableNsides=[4,128], parentLevels=6, nsideOffset=0
     // zoom=7 → baseNside=128, basePartitionNside=2 → 48 candidate cells globally
     // All project sy1=10, height=200 → normalizedY=0.05 → band [0.2, 0.4] → fraction=0.4
     // targetNside=round(128*0.4)=51 → clamp to 4 (only [4,128] available)
@@ -402,7 +402,7 @@ describe('HealpixTileset2D.getTileIndices — parentLevels', () => {
     // xd=floor(x/4) for x∈[0,47] → xd∈[0,11] → 12 unique tiles at z=2
     const ts = new HealpixTileset2D({
       availableNsides: [4, 128],
-      zoomOffset: 0,
+      nsideOffset: 0,
       parentLevels: 6
     });
     const viewport = {

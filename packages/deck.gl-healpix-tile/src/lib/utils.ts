@@ -19,14 +19,14 @@ export function clampToAvailable(target: number, available: number[]): number {
 
 /**
  * Returns the HEALPix nside for a given deck.gl zoom level.
- * Formula: nside = 2^round(zoom + zoomOffset), clamped to available nsides.
+ * Formula: nside = 2^round(zoom + nsideOffset), clamped to available nsides.
  */
 export function getNsideForZoom(
   zoom: number,
-  zoomOffset: number,
+  nsideOffset: number,
   available: number[]
 ): number {
-  const raw = Math.pow(2, Math.round(zoom + zoomOffset));
+  const raw = Math.pow(2, Math.round(zoom + nsideOffset));
   return clampToAvailable(raw, available);
 }
 

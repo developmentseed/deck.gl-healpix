@@ -1,14 +1,11 @@
 {
-  "name": "@developmentseed/deck.gl-healpix-zarr",
+  "name": "@developmentseed/deck.gl-healpix-tile",
   "version": "0.3.1",
-  "description": "HEALPix Zarr tile pyramid layer for deck.gl",
+  "description": "HEALPix tile layer for deck.gl",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "src"
-  ],
+  "files": ["dist", "src"],
   "scripts": {
     "build": "rollup -c ../../rollup.config.mjs",
     "build:watch": "rollup -c ../../rollup.config.mjs --watch",
@@ -35,19 +32,19 @@
     "@deck.gl/geo-layers": "~9.3.1",
     "@deck.gl/layers": "~9.3.1",
     "@luma.gl/core": "9.3.3",
-    "@luma.gl/engine": "9.3.3"
+    "@luma.gl/engine": "9.3.3",
+    "@luma.gl/shadertools": "9.3.3"
   },
   "dependencies": {
     "@developmentseed/deck.gl-healpix": "^0.3.1",
-    "@developmentseed/deck.gl-healpix-tile": "^0.3.1",
-    "healpix-ts": "^1.0.0",
-    "zarrita": "^0.6.1"
+    "healpix-ts": "^1.0.0"
   },
   "devDependencies": {
     "@deck.gl/core": "~9.3.1",
     "@deck.gl/geo-layers": "~9.3.1",
     "@deck.gl/layers": "~9.3.1",
     "@luma.gl/core": "9.3.3",
-    "@luma.gl/engine": "9.3.3"
+    "@luma.gl/engine": "9.3.3",
+    "@luma.gl/shadertools": "9.3.3"
   }
 }

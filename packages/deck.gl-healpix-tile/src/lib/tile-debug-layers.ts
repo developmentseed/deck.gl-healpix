@@ -14,7 +14,7 @@ export type TileDebugLayerOptions = {
   getSubLayerProps: (props: { id: string }) => LayerProps;
 };
 
-/** Path + text sublayers outlining one HEALPix Zarr tile. */
+/** Path + text sublayers outlining one HEALPix tile. */
 export function createTileDebugLayers(opts: TileDebugLayerOptions) {
   const { id, parentCell, partitionNside, tileId, getSubLayerProps } = opts;
 

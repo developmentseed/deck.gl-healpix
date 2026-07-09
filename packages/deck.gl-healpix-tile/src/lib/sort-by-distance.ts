@@ -1,5 +1,5 @@
 import { pix2LonLatNest } from 'healpix-ts';
-import type { HealpixTileIndex } from './types';
+import type { HealpixTileIndex } from '../types';
 
 /** Squared lon/lat distance in degrees (shortest longitude arc). */
 export function lonLatDistanceSq(
