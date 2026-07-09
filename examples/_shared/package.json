@@ -2,7 +2,7 @@
   "name": "deck.gl-healpix-demos-shared",
   "private": true,
   "description": "Shared components and utilities for deck.gl-healpix demos.",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "license": "MIT",
   "exports": {
     "./*": "./*"
